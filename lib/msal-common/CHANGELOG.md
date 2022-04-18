@@ -1,8 +1,16 @@
 # Change Log - @azure/msal-common
 
-This log was last generated on Mon, 04 Apr 2022 21:12:42 GMT and should not be manually modified.
+This log was last generated on Mon, 18 Apr 2022 16:02:23 GMT and should not be manually modified.
 
 <!-- Start content -->
+
+## 6.3.0
+
+Mon, 18 Apr 2022 16:02:23 GMT
+
+### Minor changes
+
+- fix: Allow direct access to Identity Token Claims #4680 (1292510+svrooij@users.noreply.github.com)
 
 ## 6.2.0
 

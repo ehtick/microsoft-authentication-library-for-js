@@ -2,6 +2,21 @@
   "name": "@azure/msal-common",
   "entries": [
     {
+      "date": "Mon, 18 Apr 2022 16:02:23 GMT",
+      "tag": "@azure/msal-common_v6.3.0",
+      "version": "6.3.0",
+      "comments": {
+        "minor": [
+          {
+            "author": "1292510+svrooij@users.noreply.github.com",
+            "package": "@azure/msal-common",
+            "commit": "ec4033ba16db2b07b7269570efd4308cbfa093ce",
+            "comment": "fix: Allow direct access to Identity Token Claims #4680"
+          }
+        ]
+      }
+    },
+    {
       "date": "Mon, 04 Apr 2022 21:12:42 GMT",
       "tag": "@azure/msal-common_v6.2.0",
       "version": "6.2.0",
