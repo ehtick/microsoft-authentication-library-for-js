@@ -12,7 +12,7 @@ import { ErrorComponent } from "../ui-components/ErrorComponent";
 import { callMsGraph } from "../utils/MsGraphApiCall";
 
 // Material-ui imports
-import Paper from "@material-ui/core/Paper";
+import Paper from "@mui/material/Paper";
 
 
 /**
@@ -70,7 +70,8 @@ class Profile extends Component {
     render() {
         
         const authRequest = {
-            ...loginRequest
+            ...loginRequest,
+            redirectUri: process.env.REACT_APP_POPUP_REDIRECT_URI // e.g. /redirect
         };
 
         return (

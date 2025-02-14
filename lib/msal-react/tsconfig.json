@@ -1,26 +1,36 @@
 {
-  "include": ["src", "types", "test"],
+  "include": [
+    "src",
+    "types",
+    "test"
+  ],
   "compilerOptions": {
-    "module": "esnext",
-    "lib": ["dom", "esnext"],
+    "moduleResolution": "nodenext",
+    "module": "nodenext",
+    "target": "es2020",
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,
     "rootDir": "./",
+    "outDir": "./dist",
     "strict": true,
+    "composite": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
     "baseUrl": "./",
     "jsx": "react",
-    "esModuleInterop": true
-  },
-  "references": [
-    {
-      "path": "../msal-browser"
-    }
-  ]
+    "esModuleInterop": true,
+    "types": [
+      "node",
+      "jest",
+      "react"
+    ]
+  }
 }

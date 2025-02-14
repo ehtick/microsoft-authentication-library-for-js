@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { CommonUsernamePasswordRequest } from "@azure/msal-common";
+import { CommonUsernamePasswordRequest } from "@azure/msal-common/node";
 
 /**
  * UsernamePassword parameters passed by the user to retrieve credentials
@@ -15,10 +15,22 @@ import { CommonUsernamePasswordRequest } from "@azure/msal-common";
  * - correlationId          - Unique GUID set per request to trace a request end-to-end for telemetry purposes.
  * - username               - username of the client
  * - password               - credentials
+ * - tokenQueryParameters   - String to string map of custom query parameters added to the /token call
  * @public
  */
-export type UsernamePasswordRequest = Partial<Omit<CommonUsernamePasswordRequest, "scopes"|"resourceRequestMethod"|"resourceRequestUri"|"username"|"password"|"requestedClaimsHash">> & {
-    scopes: Array<string>
-    username: string,
-    password: string
+export type UsernamePasswordRequest = Partial<
+    Omit<
+        CommonUsernamePasswordRequest,
+        | "scopes"
+        | "resourceRequestMethod"
+        | "resourceRequestUri"
+        | "username"
+        | "password"
+        | "requestedClaimsHash"
+        | "storeInCache"
+    >
+> & {
+    scopes: Array<string>;
+    username: string;
+    password: string;
 };

@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { Hash } from "../utils/Constants";
+import { Hash } from "../utils/Constants.js";
 import crypto from "crypto";
 
 export class HashUtils {
@@ -12,9 +12,6 @@ export class HashUtils {
      * @param buffer
      */
     sha256(buffer: string): Buffer {
-        return crypto
-            .createHash(Hash.SHA256)
-            .update(buffer)
-            .digest();
+        return crypto.createHash(Hash.SHA256).update(buffer).digest();
     }
 }

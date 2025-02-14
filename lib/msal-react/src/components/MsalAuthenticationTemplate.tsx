@@ -4,44 +4,62 @@
  */
 
 import React, { PropsWithChildren, useMemo } from "react";
-import { AccountIdentifiers } from "../types/AccountIdentifiers";
-import { getChildrenOrFunction } from "../utils/utilities";
-import { useMsal } from "../hooks/useMsal";
-import { MsalAuthenticationResult, useMsalAuthentication } from "../hooks/useMsalAuthentication";
-import { useIsAuthenticated } from "../hooks/useIsAuthenticated";
-import { InteractionType, PopupRequest, RedirectRequest, SsoSilentRequest, InteractionStatus } from "@azure/msal-browser";
-import { IMsalContext } from "../MsalContext";
+import { AccountIdentifiers } from "../types/AccountIdentifiers.js";
+import { getChildrenOrFunction } from "../utils/utilities.js";
+import { useMsal } from "../hooks/useMsal.js";
+import {
+    MsalAuthenticationResult,
+    useMsalAuthentication,
+} from "../hooks/useMsalAuthentication.js";
+import { useIsAuthenticated } from "../hooks/useIsAuthenticated.js";
+import {
+    InteractionType,
+    PopupRequest,
+    RedirectRequest,
+    SsoSilentRequest,
+    InteractionStatus,
+} from "@azure/msal-browser";
+import { IMsalContext } from "../MsalContext.js";
 
-export type MsalAuthenticationProps = PropsWithChildren<AccountIdentifiers & {
-    interactionType: InteractionType;
-    authenticationRequest?: PopupRequest|RedirectRequest|SsoSilentRequest;
-    loadingComponent?: React.ElementType<IMsalContext>;
-    errorComponent?: React.ElementType<MsalAuthenticationResult>;
-}>;
+export type MsalAuthenticationProps = PropsWithChildren<
+    AccountIdentifiers & {
+        interactionType: InteractionType;
+        authenticationRequest?:
+            | PopupRequest
+            | RedirectRequest
+            | SsoSilentRequest;
+        loadingComponent?: React.ElementType<IMsalContext>;
+        errorComponent?: React.ElementType<MsalAuthenticationResult>;
+    }
+>;
 
 /**
  * Attempts to authenticate user if not already authenticated, then renders child components
  * @param props
  */
-export function MsalAuthenticationTemplate({ 
-    interactionType, 
-    username, 
-    homeAccountId, 
+export function MsalAuthenticationTemplate({
+    interactionType,
+    username,
+    homeAccountId,
     localAccountId,
-    authenticationRequest, 
+    authenticationRequest,
     loadingComponent: LoadingComponent,
     errorComponent: ErrorComponent,
-    children 
-}: MsalAuthenticationProps): React.ReactElement|null {
+    children,
+}: MsalAuthenticationProps): React.ReactElement | null {
     const accountIdentifier: AccountIdentifiers = useMemo(() => {
         return {
             username,
             homeAccountId,
-            localAccountId
+            localAccountId,
         };
     }, [username, homeAccountId, localAccountId]);
     const context = useMsal();
-    const msalAuthResult = useMsalAuthentication(interactionType, authenticationRequest, accountIdentifier);
+    const msalAuthResult = useMsalAuthentication(
+        interactionType,
+        authenticationRequest,
+        accountIdentifier
+    );
     const isAuthenticated = useIsAuthenticated(accountIdentifier);
 
     if (msalAuthResult.error && context.inProgress === InteractionStatus.None) {
@@ -51,15 +69,15 @@ export function MsalAuthenticationTemplate({
 
         throw msalAuthResult.error;
     }
-    
+
     if (isAuthenticated) {
         return (
             <React.Fragment>
                 {getChildrenOrFunction(children, msalAuthResult)}
             </React.Fragment>
         );
-    } 
-    
+    }
+
     if (!!LoadingComponent && context.inProgress !== InteractionStatus.None) {
         return <LoadingComponent {...context} />;
     }

@@ -3,7 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { AccountCache, IdTokenCache, AccessTokenCache, RefreshTokenCache, AppMetadataCache, ValidCacheType } from "@azure/msal-common";
+import {
+    AccountCache,
+    IdTokenCache,
+    AccessTokenCache,
+    RefreshTokenCache,
+    AppMetadataCache,
+    ValidCacheType,
+} from "@azure/msal-common/node";
 
 /**
  * Key value store for in-memory cache
@@ -50,6 +57,7 @@ export type SerializedAccountEntity = {
     client_info?: string;
     last_modification_time?: string;
     last_modification_app?: string;
+    tenantProfiles?: string[];
 };
 
 /**
@@ -85,6 +93,7 @@ export type SerializedAccessTokenEntity = {
     token_type?: string;
     requestedClaims?: string;
     requestedClaimsHash?: string;
+    userAssertionHash?: string;
 };
 
 /**

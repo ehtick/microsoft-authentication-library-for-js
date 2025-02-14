@@ -3,12 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import { ISerializableTokenCache } from "../interface/ISerializableTokenCache";
+import { ISerializableTokenCache } from "../interface/ISerializableTokenCache.js";
 
 /**
  * This class instance helps track the memory changes facilitating
  * decisions to read from and write to the persistent cache
- */export class TokenCacheContext {
+ */ export class TokenCacheContext {
     /**
      * boolean indicating cache change
      */

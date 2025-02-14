@@ -3,13 +3,31 @@
  * Licensed under the MIT License.
  */
 
-import { AccountCache, IdTokenCache, AccessTokenCache, RefreshTokenCache, AppMetadataCache } from "@azure/msal-common";
-import { InMemoryCache, JsonCache, SerializedAccountEntity, SerializedIdTokenEntity, SerializedAccessTokenEntity, SerializedRefreshTokenEntity, SerializedAppMetadataEntity } from "./SerializerTypes";
+import {
+    AccountCache,
+    IdTokenCache,
+    AccessTokenCache,
+    RefreshTokenCache,
+    AppMetadataCache,
+} from "@azure/msal-common/node";
+import {
+    InMemoryCache,
+    JsonCache,
+    SerializedAccountEntity,
+    SerializedIdTokenEntity,
+    SerializedAccessTokenEntity,
+    SerializedRefreshTokenEntity,
+    SerializedAppMetadataEntity,
+} from "./SerializerTypes.js";
 
+/**
+ * This class serializes cache entities to be saved into in-memory object types defined internally
+ * @internal
+ */
 export class Serializer {
     /**
      * serialize the JSON blob
-     * @param data
+     * @param data - JSON blob cache
      */
     static serializeJSONBlob(data: JsonCache): string {
         return JSON.stringify(data);
@@ -17,9 +35,11 @@ export class Serializer {
 
     /**
      * Serialize Accounts
-     * @param accCache
+     * @param accCache - cache of accounts
      */
-    static serializeAccounts(accCache: AccountCache): Record<string, SerializedAccountEntity> {
+    static serializeAccounts(
+        accCache: AccountCache
+    ): Record<string, SerializedAccountEntity> {
         const accounts: Record<string, SerializedAccountEntity> = {};
         Object.keys(accCache).map(function (key) {
             const accountEntity = accCache[key];
@@ -34,6 +54,11 @@ export class Serializer {
                 client_info: accountEntity.clientInfo,
                 last_modification_time: accountEntity.lastModificationTime,
                 last_modification_app: accountEntity.lastModificationApp,
+                tenantProfiles: accountEntity.tenantProfiles?.map(
+                    (tenantProfile) => {
+                        return JSON.stringify(tenantProfile);
+                    }
+                ),
             };
         });
 
@@ -42,9 +67,11 @@ export class Serializer {
 
     /**
      * Serialize IdTokens
-     * @param idTCache
+     * @param idTCache - cache of ID tokens
      */
-    static serializeIdTokens(idTCache: IdTokenCache): Record<string, SerializedIdTokenEntity> {
+    static serializeIdTokens(
+        idTCache: IdTokenCache
+    ): Record<string, SerializedIdTokenEntity> {
         const idTokens: Record<string, SerializedIdTokenEntity> = {};
         Object.keys(idTCache).map(function (key) {
             const idTEntity = idTCache[key];
@@ -63,9 +90,11 @@ export class Serializer {
 
     /**
      * Serializes AccessTokens
-     * @param atCache
+     * @param atCache - cache of access tokens
      */
-    static serializeAccessTokens(atCache: AccessTokenCache): Record<string, SerializedAccessTokenEntity> {
+    static serializeAccessTokens(
+        atCache: AccessTokenCache
+    ): Record<string, SerializedAccessTokenEntity> {
         const accessTokens: Record<string, SerializedAccessTokenEntity> = {};
         Object.keys(atCache).map(function (key) {
             const atEntity = atCache[key];
@@ -84,7 +113,8 @@ export class Serializer {
                 key_id: atEntity.keyId,
                 token_type: atEntity.tokenType,
                 requestedClaims: atEntity.requestedClaims,
-                requestedClaimsHash: atEntity.requestedClaimsHash
+                requestedClaimsHash: atEntity.requestedClaimsHash,
+                userAssertionHash: atEntity.userAssertionHash,
             };
         });
 
@@ -93,9 +123,11 @@ export class Serializer {
 
     /**
      * Serialize refreshTokens
-     * @param rtCache
+     * @param rtCache - cache of refresh tokens
      */
-    static serializeRefreshTokens(rtCache: RefreshTokenCache): Record<string, SerializedRefreshTokenEntity> {
+    static serializeRefreshTokens(
+        rtCache: RefreshTokenCache
+    ): Record<string, SerializedRefreshTokenEntity> {
         const refreshTokens: Record<string, SerializedRefreshTokenEntity> = {};
         Object.keys(rtCache).map(function (key) {
             const rtEntity = rtCache[key];
@@ -107,7 +139,7 @@ export class Serializer {
                 secret: rtEntity.secret,
                 family_id: rtEntity.familyId,
                 target: rtEntity.target,
-                realm: rtEntity.realm
+                realm: rtEntity.realm,
             };
         });
 
@@ -116,9 +148,11 @@ export class Serializer {
 
     /**
      * Serialize amdtCache
-     * @param amdtCache
+     * @param amdtCache - cache of app metadata
      */
-    static serializeAppMetadata(amdtCache: AppMetadataCache): Record<string, SerializedAppMetadataEntity> {
+    static serializeAppMetadata(
+        amdtCache: AppMetadataCache
+    ): Record<string, SerializedAppMetadataEntity> {
         const appMetadata: Record<string, SerializedAppMetadataEntity> = {};
         Object.keys(amdtCache).map(function (key) {
             const amdtEntity = amdtCache[key];
@@ -134,7 +168,7 @@ export class Serializer {
 
     /**
      * Serialize the cache
-     * @param jsonContent
+     * @param inMemCache - itemised cache read from the JSON
      */
     static serializeAllCache(inMemCache: InMemoryCache): JsonCache {
         return {

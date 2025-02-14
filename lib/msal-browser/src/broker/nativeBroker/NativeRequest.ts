@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { NativeExtensionMethod } from "../../utils/BrowserConstants";
-import { StringDict } from "@azure/msal-common";
+import { NativeExtensionMethod } from "../../utils/BrowserConstants.js";
+import { StoreInCache, StringDict } from "@azure/msal-common/browser";
 
 /**
  * Token request which native broker will use to acquire tokens
@@ -30,6 +30,9 @@ export type NativeTokenRequest = {
     resourceRequestUri?: string;
     extendedExpiryToken?: boolean;
     extraParameters?: StringDict;
+    storeInCache?: StoreInCache; // Object of booleans indicating whether to store tokens in the cache or not (default is true)
+    signPopToken?: boolean; // Set to true only if token request deos not contain a PoP keyId
+    embeddedClientId?: string;
 };
 
 /**
@@ -45,7 +48,7 @@ export type NativeExtensionRequestBody = {
  */
 export type NativeExtensionRequest = {
     channel: string;
-    responseId: number;
+    responseId: string;
     extensionId?: string;
-    body: NativeExtensionRequestBody
+    body: NativeExtensionRequestBody;
 };

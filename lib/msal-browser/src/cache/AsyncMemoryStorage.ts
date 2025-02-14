@@ -3,11 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { Logger } from "@azure/msal-common";
-import { BrowserAuthError, BrowserAuthErrorMessage } from "../error/BrowserAuthError";
-import { DatabaseStorage } from "./DatabaseStorage";
-import { IAsyncStorage } from "./IAsyncMemoryStorage";
-import { MemoryStorage } from "./MemoryStorage";
+import { Logger } from "@azure/msal-common/browser";
+import {
+    BrowserAuthError,
+    BrowserAuthErrorCodes,
+} from "../error/BrowserAuthError.js";
+import { DatabaseStorage } from "./DatabaseStorage.js";
+import { IAsyncStorage } from "./IAsyncStorage.js";
+import { MemoryStorage } from "./MemoryStorage.js";
 
 /**
  * This class allows MSAL to store artifacts asynchronously using the DatabaseStorage IndexedDB wrapper,
@@ -17,18 +20,21 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
     private inMemoryCache: MemoryStorage<T>;
     private indexedDBCache: DatabaseStorage<T>;
     private logger: Logger;
-    private storeName: string;
 
-    constructor(logger: Logger, storeName: string) {
+    constructor(logger: Logger) {
         this.inMemoryCache = new MemoryStorage<T>();
         this.indexedDBCache = new DatabaseStorage<T>();
         this.logger = logger;
-        this.storeName = storeName;
     }
 
     private handleDatabaseAccessError(error: unknown): void {
-        if (error instanceof BrowserAuthError && error.errorCode === BrowserAuthErrorMessage.databaseUnavailable.code) {
-            this.logger.error("Could not access persistent storage. This may be caused by browser privacy features which block persistent storage in third-party contexts.");
+        if (
+            error instanceof BrowserAuthError &&
+            error.errorCode === BrowserAuthErrorCodes.databaseUnavailable
+        ) {
+            this.logger.error(
+                "Could not access persistent storage. This may be caused by browser privacy features which block persistent storage in third-party contexts."
+            );
         } else {
             throw error;
         }
@@ -36,13 +42,15 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
     /**
      * Get the item matching the given key. Tries in-memory cache first, then in the asynchronous
      * storage object if item isn't found in-memory.
-     * @param key 
+     * @param key
      */
     async getItem(key: string): Promise<T | null> {
         const item = this.inMemoryCache.getItem(key);
-        if(!item) {
+        if (!item) {
             try {
-                this.logger.verbose("Queried item not found in in-memory cache, now querying persistent storage.");
+                this.logger.verbose(
+                    "Queried item not found in in-memory cache, now querying persistent storage."
+                );
                 return await this.indexedDBCache.getItem(key);
             } catch (e) {
                 this.handleDatabaseAccessError(e);
@@ -54,8 +62,8 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
     /**
      * Sets the item in the in-memory cache and then tries to set it in the asynchronous
      * storage object with the given key.
-     * @param key 
-     * @param value 
+     * @param key
+     * @param value
      */
     async setItem(key: string, value: T): Promise<void> {
         this.inMemoryCache.setItem(key, value);
@@ -68,7 +76,7 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
 
     /**
      * Removes the item matching the key from the in-memory cache, then tries to remove it from the asynchronous storage object.
-     * @param key 
+     * @param key
      */
     async removeItem(key: string): Promise<void> {
         this.inMemoryCache.removeItem(key);
@@ -80,14 +88,16 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
     }
 
     /**
-     * Get all the keys from the in-memory cache as an iterable array of strings. If no keys are found, query the keys in the 
+     * Get all the keys from the in-memory cache as an iterable array of strings. If no keys are found, query the keys in the
      * asynchronous storage object.
      */
     async getKeys(): Promise<string[]> {
         const cacheKeys = this.inMemoryCache.getKeys();
         if (cacheKeys.length === 0) {
             try {
-                this.logger.verbose("In-memory cache is empty, now querying persistent storage.");
+                this.logger.verbose(
+                    "In-memory cache is empty, now querying persistent storage."
+                );
                 return await this.indexedDBCache.getKeys();
             } catch (e) {
                 this.handleDatabaseAccessError(e);
@@ -98,13 +108,15 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
 
     /**
      * Returns true or false if the given key is present in the cache.
-     * @param key 
+     * @param key
      */
     async containsKey(key: string): Promise<boolean> {
         const containsKey = this.inMemoryCache.containsKey(key);
-        if(!containsKey) {
+        if (!containsKey) {
             try {
-                this.logger.verbose("Key not found in in-memory cache, now querying persistent storage.");
+                this.logger.verbose(
+                    "Key not found in in-memory cache, now querying persistent storage."
+                );
                 return await this.indexedDBCache.containsKey(key);
             } catch (e) {
                 this.handleDatabaseAccessError(e);
@@ -118,9 +130,9 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
      */
     clearInMemory(): void {
         // InMemory cache is a Map instance, clear is straightforward
-        this.logger.verbose(`Deleting in-memory keystore ${this.storeName}`);
+        this.logger.verbose(`Deleting in-memory keystore`);
         this.inMemoryCache.clear();
-        this.logger.verbose(`In-memory keystore ${this.storeName} deleted`);
+        this.logger.verbose(`In-memory keystore deleted`);
     }
 
     /**
@@ -134,7 +146,7 @@ export class AsyncMemoryStorage<T> implements IAsyncStorage<T> {
             if (dbDeleted) {
                 this.logger.verbose("Persistent keystore deleted");
             }
-            
+
             return dbDeleted;
         } catch (e) {
             this.handleDatabaseAccessError(e);

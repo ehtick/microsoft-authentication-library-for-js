@@ -1,49 +1,35 @@
-* @jasonnutter @tnorling @sameerag @jo-arroyo @hectormmg @bmahall @peterzenz @bgavrilMS
+* @tnorling @sameerag @jo-arroyo @hectormmg @lalimasharda @peterzenz @bgavrilMS @robbie-microsoft @konstantin-msft @shylasummers
 
 # MSAL Angular
-/lib/msal-angular/ @jasonnutter @jo-arroyo @tnorling @peterzenz
-/maintenance/msal-angularjs/ @jasonnutter @jo-arroyo @tnorling @peterzenz
-/samples/msal-angular-samples/ @jasonnutter @jo-arroyo @tnorling @peterzenz
-/samples/msal-angular-v2-samples/ @jasonnutter @jo-arroyo @tnorling @peterzenz
-/samples/msal-angularjs-samples/ @jasonnutter @jo-arroyo @tnorling @peterzenz
+/lib/msal-angular/ @jo-arroyo @tnorling @peterzenz
+/samples/msal-angular-samples/ @jo-arroyo @tnorling @peterzenz
 
 # MSAL Browser
-/lib/msal-browser/ @jasonnutter @tnorling @peterzenz
-/samples/msal-browser-samples/ @jasonnutter @tnorling @peterzenz
+/lib/msal-browser/ @sameerag @tnorling @hectormmg @jo-arroyo @peterzenz @konstantin-msft @lalimasharda @shylasummers
+/samples/msal-browser-samples/ @sameerag @tnorling @hectormmg @jo-arroyo @peterzenz @konstantin-msft @lalimasharda @shylasummers
 
 # MSAL Common
-/lib/msal-common/ @sameerag @tnorling @peterzenz @bgavrilMS
-
-# MSAL Core
-/lib/msal-core/ @jasonnutter @sameerag @tnorling @peterzenz
-/samples/msal-core-samples/ @jasonnutter @sameerag @tnorling @peterzenz
+/lib/msal-common/ @sameerag @tnorling @hectormmg @jo-arroyo @peterzenz @robbie-microsoft @konstantin-msft @lalimasharda @shylasummers
 
 # MSAL Node
-/lib/msal-node/ @sameerag @hectormmg @bmahall @peterzenz @jennyf19 @jmprieur @bgavrilMS
-/samples/msal-node-samples/ @sameerag @hectormmg @bmahall @peterzenz @jennyf19 @jmprieur @bgavrilMS
-/extensions/msal-node-extensions/ @sameerag @hectormmg @bmahall @peterzenz @jennyf19 @jmprieur @bgavrilMS
-
-# ADAL Node
-/maintenance/adal-node @sameerag @peterzenz @bgavrilMS
-
-# Passport Azure Ad
-/maintenance/passport-azure-ad @jennyf19 @jmprieur @bgavrilMS
+/lib/msal-node/ @sameerag @tnorling @hectormmg @peterzenz @AzureAD/id4s-msal-team
+/samples/msal-node-samples/ @sameerag @tnorling @hectormmg @peterzenz @AzureAD/id4s-msal-team
+/extensions/msal-node-extensions/ @sameerag @tnorling @hectormmg @peterzenz
 
 # MSAL React
-/lib/msal-react/ @tnorling @jasonnutter @jo-arroyo @peterzenz
-/samples/msal-react-samples/ @tnorling @jasonnutter @jo-arroyo @peterzenz
-
-# Node Token Validation
-/lib/node-token-validation @jennyf19 @jmprieur @bgavrilMS
-/samples/node-token-validation @jennyf19 @jmprieur @bgavrilMS
-
-## ADAL.js
-/maintenance/adal-angular @jasonnutter @sameerag @peterzenz
+/lib/msal-react/ @tnorling @jo-arroyo @peterzenz
+/samples/msal-react-samples/ @tnorling @jo-arroyo @peterzenz
 
 # Build
-/build/ @jasonnutter @tnorling @bmahall @peterzenz
-/release-scripts/ @jasonnutter @tnorling @bmahall @peterzenz
-/.github/ @jasonnutter @tnorling @bmahall @peterzenz
+/build/ @sameerag @tnorling @hectormmg @peterzenz
+/release-scripts/ @sameerag @tnorling @hectormmg @peterzenz
+/.github/ @sameerag @tnorling @hectormmg @peterzenz
+/.pipelines/ @hectormmg @tnorling @peterzenz @sameerag @konstantin-msft
+
+# MSAL Node Confidential Client Regression Tests
+.github/workflows/client-credential-benchmark.yml @AzureAD/id4s-msal-team
+.github/workflows/msal-node-confidential-client-benchmarks.yml @AzureAD/id4s-msal-team
+/regression-tests/msal-node/ @AzureAD/id4s-msal-team
 
 # Filepaths to ignore
 /change/

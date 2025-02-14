@@ -1,18 +1,29 @@
 {
-  "include": ["src", "test"],
-  "exclude": ["node_modules"],
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "include": [
+    "src",
+    "test"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
   "compilerOptions": {
-    "target": "es6",
-    "module": "esnext",
+    "target": "es2020",
+    "moduleResolution": "nodenext",
+    "module": "nodenext",
     "declaration": true,
     "declarationMap": true,
-    "lib": ["dom", "esnext"],
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "importHelpers": true,
     "sourceMap": true,
     "rootDir": "./",
     "outDir": "./dist",
     "strict": true,
     "noImplicitAny": true,
+    "composite": false,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictPropertyInitialization": false,
@@ -23,17 +34,15 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
     "jsx": "react",
     "esModuleInterop": true,
     "suppressImplicitAnyIndexErrors": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "types": [
+      "jest",
+      "node"
+    ]
   },
   "compileOnSave": false,
-  "buildOnSave": false,
-  "references": [
-    {
-      "path": "../msal-common"
-    }
-  ]
+  "buildOnSave": false
 }

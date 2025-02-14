@@ -1,16 +1,35 @@
-import { LogLevel, Logger, TokenCacheContext, ICachePlugin } from '@azure/msal-common';
-import { NodeStorage } from '../../src/cache/NodeStorage';
-import { TokenCache } from '../../src/cache/TokenCache';
-import { promises as fs } from 'fs';
-import { version, name } from '../../package.json';
-import { DEFAULT_CRYPTO_IMPLEMENTATION, TEST_CONSTANTS } from '../utils/TestConstants';
-import * as msalCommon from '@azure/msal-common';
-import { Deserializer } from '../../src/cache/serializer/Deserializer';
-import { JsonCache } from '../../src';
+/*
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
+
+import {
+    LogLevel,
+    Logger,
+    TokenCacheContext,
+    ICachePlugin,
+    buildStaticAuthorityOptions,
+} from "@azure/msal-common";
+import { NodeStorage } from "../../src/cache/NodeStorage.js";
+import { TokenCache } from "../../src/cache/TokenCache.js";
+import { existsSync, watch, promises, FSWatcher } from "fs";
+import { version, name } from "../../package.json";
+import {
+    DEFAULT_CRYPTO_IMPLEMENTATION,
+    ID_TOKEN_CLAIMS,
+} from "../utils/TestConstants.js";
+import { Deserializer } from "../../src/cache/serializer/Deserializer.js";
+import { JsonCache } from "../../src/index.js";
+import { MSALCommonModule } from "../utils/MockUtils.js";
+
+const msalCommon: MSALCommonModule = jest.requireActual(
+    "@azure/msal-common/node"
+);
 
 describe("TokenCache tests", () => {
-
     let logger: Logger;
+    let storage: NodeStorage;
+    let watcher: FSWatcher;
 
     beforeEach(() => {
         const loggerOptions = {
@@ -21,11 +40,29 @@ describe("TokenCache tests", () => {
             logLevel: LogLevel.Info,
         };
         logger = new Logger(loggerOptions!, name, version);
+        storage = new NodeStorage(
+            logger,
+            "mock_client_id",
+            {
+                ...DEFAULT_CRYPTO_IMPLEMENTATION,
+                base64Decode: (): string => {
+                    return JSON.stringify(ID_TOKEN_CLAIMS);
+                },
+            },
+            buildStaticAuthorityOptions({
+                authority: "https://login.microsoftonline.com/common",
+            })
+        );
         jest.restoreAllMocks();
     });
 
+    afterEach(() => {
+        if (watcher) {
+            watcher.close();
+        }
+    });
+
     it("Constructor tests builds default token cache", async () => {
-        let storage: NodeStorage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
         const tokenCache = new TokenCache(storage, logger);
         expect(tokenCache).toBeInstanceOf(TokenCache);
         expect(tokenCache.hasChanged()).toEqual(false);
@@ -33,8 +70,7 @@ describe("TokenCache tests", () => {
     });
 
     it("TokenCache serialize/deserialize", () => {
-        const cache = require('./cache-test-files/default-cache.json');
-        const storage: NodeStorage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
+        const cache = require("./cache-test-files/default-cache.json");
         const tokenCache = new TokenCache(storage, logger);
 
         tokenCache.deserialize(JSON.stringify(cache));
@@ -47,7 +83,6 @@ describe("TokenCache tests", () => {
 
     it("TokenCache should not fail when attempting to deserialize an empty string", () => {
         const cache = "";
-        const storage: NodeStorage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
         const tokenCache = new TokenCache(storage, logger);
 
         tokenCache.deserialize(cache);
@@ -55,8 +90,7 @@ describe("TokenCache tests", () => {
     });
 
     it("TokenCache serialize/deserialize, does not remove unrecognized entities", () => {
-        const cache = require('./cache-test-files/cache-unrecognized-entities.json');
-        const storage: NodeStorage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
+        const cache = require("./cache-test-files/cache-unrecognized-entities.json");
         const tokenCache = new TokenCache(storage, logger);
 
         tokenCache.deserialize(JSON.stringify(cache));
@@ -70,8 +104,8 @@ describe("TokenCache tests", () => {
     it("TokenCache.mergeRemovals removes entities from the cache, but does not remove other entities", async () => {
         // TokenCache should not remove unrecognized entities from JSON file, even if they
         // are deeply nested, and should write them back out
-        const cache = require('./cache-test-files/cache-unrecognized-entities.json');
-        const storage: NodeStorage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
+        const cache = require("./cache-test-files/cache-unrecognized-entities.json");
+
         const tokenCache = new TokenCache(storage, logger);
 
         tokenCache.deserialize(JSON.stringify(cache));
@@ -85,62 +119,115 @@ describe("TokenCache tests", () => {
         expect(tokenCacheAfterSerialization.RefreshToken).toEqual({});
         expect(tokenCacheAfterSerialization.AccessToken).toEqual({});
         expect(tokenCacheAfterSerialization.IdToken).toEqual({});
-        expect(tokenCacheAfterSerialization.Unrecognized_Entity).toEqual(cache.Unrecognized_Entity);
+        expect(tokenCacheAfterSerialization.Unrecognized_Entity).toEqual(
+            cache.Unrecognized_Entity
+        );
     });
 
     it("TokenCache beforeCacheAccess and afterCacheAccess", async () => {
-
         const beforeCacheAccess = async (context: TokenCacheContext) => {
-            context.tokenCache.deserialize(await fs.readFile("./test/cache/cache-test-files/cache-unrecognized-entities.json", "utf-8"));
+            context.tokenCache.deserialize(
+                await promises.readFile(
+                    "./test/cache/cache-test-files/cache-unrecognized-entities.json",
+                    "utf-8"
+                )
+            );
         };
         const cachePath = "./test/cache/cache-test-files/temp-cache.json";
         const afterCacheAccess = async (context: TokenCacheContext) => {
-            await fs.writeFile(cachePath, context.tokenCache.serialize());
-        }
+            await promises.writeFile(cachePath, context.tokenCache.serialize());
+        };
 
         const cachePlugin: ICachePlugin = {
             beforeCacheAccess,
-            afterCacheAccess
+            afterCacheAccess,
         };
 
-        const storage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
         const tokenCache = new TokenCache(storage, logger, cachePlugin);
 
         const mockTokenCacheContextInstance = {
             hasChanged: false,
             cache: tokenCache,
             cacheHasChanged: false,
-            tokenCache
-        }
+            tokenCache,
+        };
 
-        jest.spyOn(msalCommon, 'TokenCacheContext')
-            .mockImplementation(() => mockTokenCacheContextInstance as unknown as TokenCacheContext)
+        jest.spyOn(msalCommon, "TokenCacheContext").mockImplementation(
+            () => mockTokenCacheContextInstance as unknown as TokenCacheContext
+        );
 
         const accounts = await tokenCache.getAllAccounts();
         expect(msalCommon.TokenCacheContext).toHaveBeenCalled();
         expect(accounts.length).toBe(1);
-        expect(require('./cache-test-files/temp-cache.json')).toEqual(require('./cache-test-files/cache-unrecognized-entities.json'));
+        expect(require("./cache-test-files/temp-cache.json")).toEqual(
+            require("./cache-test-files/cache-unrecognized-entities.json")
+        );
 
         // try and clean up
         try {
-            await fs.unlink(cachePath);
+            await promises.unlink(cachePath);
         } catch (err) {
-            if (err.code == "ENOENT") {
-                console.log("Tried to delete temp cache file but it does not exist");
+            const errnoException = err as NodeJS.ErrnoException;
+            if (errnoException.code == "ENOENT") {
+                console.log(
+                    "Tried to delete temp cache file but it does not exist"
+                );
             }
         }
     });
 
-    it('should return an empty KV store if TokenCache is empty', () => {
-        const storage: NodeStorage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
+    it("getAllAccounts doesn't write to cache", async () => {
+        const cachePath =
+            "./test/cache/cache-test-files/cache-unrecognized-entities.json";
+        if (existsSync(cachePath)) {
+            watcher = watch(cachePath, (eventType: string) => {
+                if (eventType === "change") {
+                    throw new Error("test cache changed");
+                }
+            });
+        } else {
+            throw new Error("error in watching test cache");
+        }
+
+        const beforeCacheAccess = jest.fn(
+            async (context: TokenCacheContext) => {
+                if (context.hasChanged == true) {
+                    throw new Error("hasChanged should be false");
+                }
+                return promises.readFile(cachePath, "utf-8").then((data) => {
+                    context.tokenCache.deserialize(data);
+                });
+            }
+        );
+
+        const afterCacheAccess = jest.fn(async (context: TokenCacheContext) => {
+            if (context.hasChanged == true) {
+                throw new Error("hasChanged should be false");
+            }
+            return Promise.resolve();
+        });
+
+        const cachePlugin: ICachePlugin = {
+            beforeCacheAccess,
+            afterCacheAccess,
+        };
+
+        const tokenCache = new TokenCache(storage, logger, cachePlugin);
+
+        const accounts = await tokenCache.getAllAccounts();
+        expect(accounts.length).toBe(1);
+        expect(beforeCacheAccess).toHaveBeenCalled();
+        expect(afterCacheAccess).toHaveBeenCalled();
+    });
+
+    it("should return an empty KV store if TokenCache is empty", () => {
         const tokenCache = new TokenCache(storage, logger);
 
         expect(tokenCache.getKVStore()).toEqual({});
-    })
+    });
 
-    it('should return stored entities in KV store', () => {
-        const cache: JsonCache = require('./cache-test-files/default-cache.json');
-        const storage: NodeStorage = new NodeStorage(logger, TEST_CONSTANTS.CLIENT_ID, DEFAULT_CRYPTO_IMPLEMENTATION);
+    it("should return stored entities in KV store", () => {
+        const cache: JsonCache = require("./cache-test-files/default-cache.json");
         const tokenCache = new TokenCache(storage, logger);
 
         tokenCache.deserialize(JSON.stringify(cache));
@@ -149,11 +236,59 @@ describe("TokenCache tests", () => {
 
         const kvStore = tokenCache.getKVStore();
 
-        Object.values(expectedCachedEntities).forEach(expectedCacheSection => {
-            Object.keys(expectedCacheSection).forEach(cacheKey => {
-                expect(kvStore[cacheKey]).toEqual(expectedCacheSection[cacheKey]);
-            })
-        })
-    })
+        Object.values(expectedCachedEntities).forEach(
+            (expectedCacheSection) => {
+                Object.keys(expectedCacheSection).forEach((cacheKey) => {
+                    expect(kvStore[cacheKey]).toEqual(
+                        expectedCacheSection[cacheKey]
+                    );
+                });
+            }
+        );
+    });
 
+    it("overwriteCache should overwrite the in-memory cache with persistent cache if exists", async () => {
+        const cachePath = "./test/cache/cache-test-files/default-cache.json";
+        const beforeCacheAccess = async (context: TokenCacheContext) => {
+            context.tokenCache.deserialize(
+                await promises.readFile(cachePath, "utf-8")
+            );
+        };
+        const afterCacheAccess = async (context: TokenCacheContext) => {
+            await promises.writeFile(cachePath, context.tokenCache.serialize());
+        };
+
+        const cachePlugin: ICachePlugin = {
+            beforeCacheAccess,
+            afterCacheAccess,
+        };
+
+        const tokenCache = new TokenCache(storage, logger, cachePlugin);
+
+        const clearSpy = jest.spyOn(NodeStorage.prototype, "clear");
+        // persistent cache in CacheKVStore format
+        const deserializedCacheSpy = jest.spyOn(
+            NodeStorage.prototype,
+            "inMemoryCacheToCache"
+        );
+
+        await tokenCache.overwriteCache();
+        expect(clearSpy).toHaveBeenCalled();
+        expect(deserializedCacheSpy).toHaveBeenCalledTimes(2); // first call returns serialized cache, second call returns deserialized cache
+        expect(deserializedCacheSpy.mock.results[1].value).toBe(
+            tokenCache.getKVStore()
+        );
+    });
+
+    it("overwriteCache should not throw and simply return if persistent cache does not exist", async () => {
+        const tokenCache = new TokenCache(storage, logger);
+
+        const clearSpy = jest.spyOn(NodeStorage.prototype, "clear");
+        const setSpy = jest.spyOn(NodeStorage.prototype, "setCache");
+
+        await tokenCache.overwriteCache();
+        expect(clearSpy).not.toHaveBeenCalled();
+        expect(setSpy).not.toHaveBeenCalled();
+        expect(tokenCache.getKVStore()).toEqual({});
+    });
 });

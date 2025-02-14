@@ -3,21 +3,26 @@
  * Licensed under the MIT License.
  */
 
-import { JwtHeader, sign } from "jsonwebtoken";
-import { TimeUtils, ClientAuthError, Constants } from "@azure/msal-common";
-import { CryptoProvider } from "../crypto/CryptoProvider";
-import { EncodingUtils } from "../utils/EncodingUtils";
-import { JwtConstants } from "../utils/Constants";
+import jwt from "jsonwebtoken";
+import {
+    TimeUtils,
+    Constants,
+    createClientAuthError,
+    ClientAuthErrorCodes,
+} from "@azure/msal-common/node";
+import { CryptoProvider } from "../crypto/CryptoProvider.js";
+import { EncodingUtils } from "../utils/EncodingUtils.js";
+import { JwtConstants } from "../utils/Constants.js";
 
 /**
  * Client assertion of type jwt-bearer used in confidential client flows
  * @public
  */
 export class ClientAssertion {
-
     private jwt: string;
     private privateKey: string;
     private thumbprint: string;
+    private useSha256: boolean;
     private expirationTime: number;
     private issuer: string;
     private jwtAudience: string;
@@ -34,17 +39,46 @@ export class ClientAssertion {
     }
 
     /**
+     * @deprecated Use fromCertificateWithSha256Thumbprint instead, with a SHA-256 thumprint
      * Initialize the ClientAssertion class from the certificate passed by the user
      * @param thumbprint - identifier of a certificate
      * @param privateKey - secret key
      * @param publicCertificate - electronic document provided to prove the ownership of the public key
      */
-    public static fromCertificate(thumbprint: string, privateKey: string, publicCertificate?: string): ClientAssertion {
+    public static fromCertificate(
+        thumbprint: string,
+        privateKey: string,
+        publicCertificate?: string
+    ): ClientAssertion {
         const clientAssertion = new ClientAssertion();
         clientAssertion.privateKey = privateKey;
         clientAssertion.thumbprint = thumbprint;
+        clientAssertion.useSha256 = false;
         if (publicCertificate) {
-            clientAssertion.publicCertificate = this.parseCertificate(publicCertificate);
+            clientAssertion.publicCertificate =
+                this.parseCertificate(publicCertificate);
+        }
+        return clientAssertion;
+    }
+
+    /**
+     * Initialize the ClientAssertion class from the certificate passed by the user
+     * @param thumbprint - identifier of a certificate
+     * @param privateKey - secret key
+     * @param publicCertificate - electronic document provided to prove the ownership of the public key
+     */
+    public static fromCertificateWithSha256Thumbprint(
+        thumbprint: string,
+        privateKey: string,
+        publicCertificate?: string
+    ): ClientAssertion {
+        const clientAssertion = new ClientAssertion();
+        clientAssertion.privateKey = privateKey;
+        clientAssertion.thumbprint = thumbprint;
+        clientAssertion.useSha256 = true;
+        if (publicCertificate) {
+            clientAssertion.publicCertificate =
+                this.parseCertificate(publicCertificate);
         }
         return clientAssertion;
     }
@@ -55,11 +89,19 @@ export class ClientAssertion {
      * @param issuer - iss claim
      * @param jwtAudience - aud claim
      */
-    public getJwt(cryptoProvider: CryptoProvider, issuer: string, jwtAudience: string): string {
+    public getJwt(
+        cryptoProvider: CryptoProvider,
+        issuer: string,
+        jwtAudience: string
+    ): string {
         // if assertion was created from certificate, check if jwt is expired and create new one.
         if (this.privateKey && this.thumbprint) {
-
-            if (this.jwt && !this.isExpired() && issuer === this.issuer && jwtAudience === this.jwtAudience) {
+            if (
+                this.jwt &&
+                !this.isExpired() &&
+                issuer === this.issuer &&
+                jwtAudience === this.jwtAudience
+            ) {
                 return this.jwt;
             }
 
@@ -74,28 +116,43 @@ export class ClientAssertion {
             return this.jwt;
         }
 
-        throw ClientAuthError.createInvalidAssertionError();
+        throw createClientAuthError(ClientAuthErrorCodes.invalidAssertion);
     }
 
     /**
      * JWT format and required claims specified: https://tools.ietf.org/html/rfc7523#section-3
      */
-    private createJwt(cryptoProvider: CryptoProvider, issuer: string, jwtAudience: string): string {
-
+    private createJwt(
+        cryptoProvider: CryptoProvider,
+        issuer: string,
+        jwtAudience: string
+    ): string {
         this.issuer = issuer;
         this.jwtAudience = jwtAudience;
         const issuedAt = TimeUtils.nowSeconds();
         this.expirationTime = issuedAt + 600;
 
-        const header: JwtHeader = {
-            alg: JwtConstants.RSA_256,
-            x5t: EncodingUtils.base64EncodeUrl(this.thumbprint, "hex")
+        const algorithm = this.useSha256
+            ? JwtConstants.PSS_256
+            : JwtConstants.RSA_256;
+        const header: jwt.JwtHeader = {
+            alg: algorithm,
         };
+
+        const thumbprintHeader = this.useSha256
+            ? JwtConstants.X5T_256
+            : JwtConstants.X5T;
+        Object.assign(header, {
+            [thumbprintHeader]: EncodingUtils.base64EncodeUrl(
+                this.thumbprint,
+                "hex"
+            ),
+        } as Partial<jwt.JwtHeader>);
 
         if (this.publicCertificate) {
             Object.assign(header, {
-                x5c: this.publicCertificate
-            } as Partial<JwtHeader>);
+                [JwtConstants.X5C]: this.publicCertificate,
+            } as Partial<jwt.JwtHeader>);
         }
 
         const payload = {
@@ -104,10 +161,10 @@ export class ClientAssertion {
             [JwtConstants.ISSUER]: this.issuer,
             [JwtConstants.SUBJECT]: this.issuer,
             [JwtConstants.NOT_BEFORE]: issuedAt,
-            [JwtConstants.JWT_ID]: cryptoProvider.createNewGuid()
+            [JwtConstants.JWT_ID]: cryptoProvider.createNewGuid(),
         };
 
-        this.jwt = sign(payload, this.privateKey, { header });
+        this.jwt = jwt.sign(payload, this.privateKey, { header });
         return this.jwt;
     }
 
@@ -130,7 +187,8 @@ export class ClientAssertion {
          * "." means any string character, "+" means match 1 or more times, and "?" means the shortest match.
          * The "g" at the end of the regex means search the string globally, and the "s" enables the "." to match newlines.
          */
-        const regexToFindCerts = /-----BEGIN CERTIFICATE-----\r*\n(.+?)\r*\n-----END CERTIFICATE-----/gs;
+        const regexToFindCerts =
+            /-----BEGIN CERTIFICATE-----\r*\n(.+?)\r*\n-----END CERTIFICATE-----/gs;
         const certs: string[] = [];
 
         let matches;

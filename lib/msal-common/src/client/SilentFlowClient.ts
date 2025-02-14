@@ -3,124 +3,209 @@
  * Licensed under the MIT License.
  */
 
-import { BaseClient } from "./BaseClient";
-import { ClientConfiguration } from "../config/ClientConfiguration";
-import { CommonSilentFlowRequest } from "../request/CommonSilentFlowRequest";
-import { AuthenticationResult } from "../response/AuthenticationResult";
-import { AuthToken } from "../account/AuthToken";
-import { TimeUtils } from "../utils/TimeUtils";
-import { RefreshTokenClient } from "./RefreshTokenClient";
-import { ClientAuthError, ClientAuthErrorMessage } from "../error/ClientAuthError";
-import { ClientConfigurationError } from "../error/ClientConfigurationError";
-import { ResponseHandler } from "../response/ResponseHandler";
-import { CacheRecord } from "../cache/entities/CacheRecord";
-import { CacheOutcome } from "../utils/Constants";
-import { IPerformanceClient } from "../telemetry/performance/IPerformanceClient";
+import { BaseClient } from "./BaseClient.js";
+import { ClientConfiguration } from "../config/ClientConfiguration.js";
+import { CommonSilentFlowRequest } from "../request/CommonSilentFlowRequest.js";
+import { AuthenticationResult } from "../response/AuthenticationResult.js";
+import * as TimeUtils from "../utils/TimeUtils.js";
+import {
+    ClientAuthErrorCodes,
+    createClientAuthError,
+} from "../error/ClientAuthError.js";
+import { ResponseHandler } from "../response/ResponseHandler.js";
+import { CacheRecord } from "../cache/entities/CacheRecord.js";
+import { CacheOutcome } from "../utils/Constants.js";
+import { IPerformanceClient } from "../telemetry/performance/IPerformanceClient.js";
+import { StringUtils } from "../utils/StringUtils.js";
+import { checkMaxAge, extractTokenClaims } from "../account/AuthToken.js";
+import { TokenClaims } from "../account/TokenClaims.js";
+import { PerformanceEvents } from "../telemetry/performance/PerformanceEvent.js";
+import { invokeAsync } from "../utils/FunctionWrappers.js";
+import { getTenantFromAuthorityString } from "../authority/Authority.js";
 
+/** @internal */
 export class SilentFlowClient extends BaseClient {
-    
-    constructor(configuration: ClientConfiguration, performanceClient?: IPerformanceClient) {
-        super(configuration,performanceClient);
-    }
-
-    /**
-     * Retrieves a token from cache if it is still valid, or uses the cached refresh token to renew
-     * the given token and returns the renewed token
-     * @param request
-     */
-    async acquireToken(request: CommonSilentFlowRequest): Promise<AuthenticationResult> {
-        try {
-            return await this.acquireCachedToken(request);
-        } catch (e) {
-            if (e instanceof ClientAuthError && e.errorCode === ClientAuthErrorMessage.tokenRefreshRequired.code) {
-                const refreshTokenClient = new RefreshTokenClient(this.config, this.performanceClient);
-                return refreshTokenClient.acquireTokenByRefreshToken(request);
-            } else {
-                throw e;
-            }
-        }
+    constructor(
+        configuration: ClientConfiguration,
+        performanceClient?: IPerformanceClient
+    ) {
+        super(configuration, performanceClient);
     }
 
     /**
      * Retrieves token from cache or throws an error if it must be refreshed.
      * @param request
      */
-    async acquireCachedToken(request: CommonSilentFlowRequest): Promise<AuthenticationResult> {
-        // Cannot renew token if no request object is given.
-        if (!request) {
-            throw ClientConfigurationError.createEmptyTokenRequestError();
-        }
+    async acquireCachedToken(
+        request: CommonSilentFlowRequest
+    ): Promise<[AuthenticationResult, CacheOutcome]> {
+        this.performanceClient?.addQueueMeasurement(
+            PerformanceEvents.SilentFlowClientAcquireCachedToken,
+            request.correlationId
+        );
+        let lastCacheOutcome: CacheOutcome = CacheOutcome.NOT_APPLICABLE;
 
-        if (request.forceRefresh) {
+        if (
+            request.forceRefresh ||
+            (!this.config.cacheOptions.claimsBasedCachingEnabled &&
+                !StringUtils.isEmptyObj(request.claims))
+        ) {
             // Must refresh due to present force_refresh flag.
-            this.serverTelemetryManager?.setCacheOutcome(CacheOutcome.FORCE_REFRESH);
-            this.logger.info("SilentFlowClient:acquireCachedToken - Skipping cache because forceRefresh is true.");
-            throw ClientAuthError.createRefreshRequiredError();
+            this.setCacheOutcome(
+                CacheOutcome.FORCE_REFRESH_OR_CLAIMS,
+                request.correlationId
+            );
+            throw createClientAuthError(
+                ClientAuthErrorCodes.tokenRefreshRequired
+            );
         }
 
         // We currently do not support silent flow for account === null use cases; This will be revisited for confidential flow usecases
         if (!request.account) {
-            throw ClientAuthError.createNoAccountInSilentRequestError();
+            throw createClientAuthError(
+                ClientAuthErrorCodes.noAccountInSilentRequest
+            );
         }
 
-        const environment = request.authority || this.authority.getPreferredCache();
+        const requestTenantId =
+            request.account.tenantId ||
+            getTenantFromAuthorityString(request.authority);
+        const tokenKeys = this.cacheManager.getTokenKeys();
+        const cachedAccessToken = this.cacheManager.getAccessToken(
+            request.account,
+            request,
+            tokenKeys,
+            requestTenantId,
+            this.performanceClient,
+            request.correlationId
+        );
 
-        const cacheRecord = this.cacheManager.readCacheRecord(request.account, this.config.authOptions.clientId, request, environment);
-
-        if (!cacheRecord.accessToken) {
-            // Must refresh due to non-existent access_token.
-            this.serverTelemetryManager?.setCacheOutcome(CacheOutcome.NO_CACHED_ACCESS_TOKEN);
-            this.logger.info("SilentFlowClient:acquireCachedToken - No access token found in cache for the given properties.");
-            throw ClientAuthError.createRefreshRequiredError();
+        if (!cachedAccessToken) {
+            // must refresh due to non-existent access_token
+            this.setCacheOutcome(
+                CacheOutcome.NO_CACHED_ACCESS_TOKEN,
+                request.correlationId
+            );
+            throw createClientAuthError(
+                ClientAuthErrorCodes.tokenRefreshRequired
+            );
         } else if (
-            TimeUtils.wasClockTurnedBack(cacheRecord.accessToken.cachedAt) ||
-            TimeUtils.isTokenExpired(cacheRecord.accessToken.expiresOn, this.config.systemOptions.tokenRenewalOffsetSeconds)
+            TimeUtils.wasClockTurnedBack(cachedAccessToken.cachedAt) ||
+            TimeUtils.isTokenExpired(
+                cachedAccessToken.expiresOn,
+                this.config.systemOptions.tokenRenewalOffsetSeconds
+            )
         ) {
-            // Must refresh due to expired access_token.
-            this.serverTelemetryManager?.setCacheOutcome(CacheOutcome.CACHED_ACCESS_TOKEN_EXPIRED);
-            this.logger.info(`SilentFlowClient:acquireCachedToken - Cached access token is expired or will expire within ${this.config.systemOptions.tokenRenewalOffsetSeconds} seconds.`);
-            throw ClientAuthError.createRefreshRequiredError();
-        } else if (cacheRecord.accessToken.refreshOn && TimeUtils.isTokenExpired(cacheRecord.accessToken.refreshOn, 0)) {
-            // Must refresh due to the refresh_in value.
-            this.serverTelemetryManager?.setCacheOutcome(CacheOutcome.REFRESH_CACHED_ACCESS_TOKEN);
-            this.logger.info("SilentFlowClient:acquireCachedToken - Cached access token's refreshOn property has been exceeded'.");
-            throw ClientAuthError.createRefreshRequiredError();
+            // must refresh due to the expires_in value
+            this.setCacheOutcome(
+                CacheOutcome.CACHED_ACCESS_TOKEN_EXPIRED,
+                request.correlationId
+            );
+            throw createClientAuthError(
+                ClientAuthErrorCodes.tokenRefreshRequired
+            );
+        } else if (
+            cachedAccessToken.refreshOn &&
+            TimeUtils.isTokenExpired(cachedAccessToken.refreshOn, 0)
+        ) {
+            // must refresh (in the background) due to the refresh_in value
+            lastCacheOutcome = CacheOutcome.PROACTIVELY_REFRESHED;
+
+            // don't throw ClientAuthError.createRefreshRequiredError(), return cached token instead
         }
+
+        const environment =
+            request.authority || this.authority.getPreferredCache();
+        const cacheRecord: CacheRecord = {
+            account: this.cacheManager.readAccountFromCache(request.account),
+            accessToken: cachedAccessToken,
+            idToken: this.cacheManager.getIdToken(
+                request.account,
+                tokenKeys,
+                requestTenantId,
+                this.performanceClient,
+                request.correlationId
+            ),
+            refreshToken: null,
+            appMetadata:
+                this.cacheManager.readAppMetadataFromCache(environment),
+        };
+
+        this.setCacheOutcome(lastCacheOutcome, request.correlationId);
 
         if (this.config.serverTelemetryManager) {
             this.config.serverTelemetryManager.incrementCacheHits();
         }
 
-        return await this.generateResultFromCacheRecord(cacheRecord, request);
+        return [
+            await invokeAsync(
+                this.generateResultFromCacheRecord.bind(this),
+                PerformanceEvents.SilentFlowClientGenerateResultFromCacheRecord,
+                this.logger,
+                this.performanceClient,
+                request.correlationId
+            )(cacheRecord, request),
+            lastCacheOutcome,
+        ];
+    }
+
+    private setCacheOutcome(
+        cacheOutcome: CacheOutcome,
+        correlationId: string
+    ): void {
+        this.serverTelemetryManager?.setCacheOutcome(cacheOutcome);
+        this.performanceClient?.addFields(
+            {
+                cacheOutcome: cacheOutcome,
+            },
+            correlationId
+        );
+        if (cacheOutcome !== CacheOutcome.NOT_APPLICABLE) {
+            this.logger.info(
+                `Token refresh is required due to cache outcome: ${cacheOutcome}`
+            );
+        }
     }
 
     /**
      * Helper function to build response object from the CacheRecord
      * @param cacheRecord
      */
-    private async generateResultFromCacheRecord(cacheRecord: CacheRecord, request: CommonSilentFlowRequest): Promise<AuthenticationResult> {
-        let idTokenObj: AuthToken | undefined;
+    private async generateResultFromCacheRecord(
+        cacheRecord: CacheRecord,
+        request: CommonSilentFlowRequest
+    ): Promise<AuthenticationResult> {
+        this.performanceClient?.addQueueMeasurement(
+            PerformanceEvents.SilentFlowClientGenerateResultFromCacheRecord,
+            request.correlationId
+        );
+        let idTokenClaims: TokenClaims | undefined;
         if (cacheRecord.idToken) {
-            idTokenObj = new AuthToken(cacheRecord.idToken.secret, this.config.cryptoInterface);
+            idTokenClaims = extractTokenClaims(
+                cacheRecord.idToken.secret,
+                this.config.cryptoInterface.base64Decode
+            );
         }
 
         // token max_age check
-        if (request.maxAge || (request.maxAge === 0)) {
-            const authTime = idTokenObj?.claims.auth_time;
+        if (request.maxAge || request.maxAge === 0) {
+            const authTime = idTokenClaims?.auth_time;
             if (!authTime) {
-                throw ClientAuthError.createAuthTimeNotFoundError();
+                throw createClientAuthError(
+                    ClientAuthErrorCodes.authTimeNotFound
+                );
             }
 
-            AuthToken.checkMaxAge(authTime, request.maxAge);
+            checkMaxAge(authTime, request.maxAge);
         }
 
-        return await ResponseHandler.generateAuthenticationResult(
+        return ResponseHandler.generateAuthenticationResult(
             this.cryptoUtils,
             this.authority,
             cacheRecord,
             true,
             request,
-            idTokenObj
+            idTokenClaims
         );
     }
 }

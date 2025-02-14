@@ -3,14 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import { AccountInfo } from "@azure/msal-common";
+import { AccountInfo } from "@azure/msal-common/node";
 
 /**
  * Token cache interface for the client, giving access to cache APIs
  * @public
  */
 export interface ITokenCache {
-
     /** API that retrieves all accounts currently in cache to the user */
     getAllAccounts(): Promise<AccountInfo[]>;
 

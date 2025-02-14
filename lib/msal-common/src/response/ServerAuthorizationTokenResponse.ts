@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { AuthenticationScheme } from "../utils/Constants";
+import { AuthenticationScheme } from "../utils/Constants.js";
 
 /**
  * Deserialized response object from server authorization code request.
@@ -24,8 +24,10 @@ import { AuthenticationScheme } from "../utils/Constants";
  * - timestamp: The time at which the error occurred.
  * - trace_id: A unique identifier for the request that can help in diagnostics.
  * - correlation_id: A unique identifier for the request that can help in diagnostics across components.
+ * - status: the network request's response status
  */
 export type ServerAuthorizationTokenResponse = {
+    status?: number;
     // Success
     token_type?: AuthenticationScheme;
     scope?: string;
@@ -34,10 +36,12 @@ export type ServerAuthorizationTokenResponse = {
     ext_expires_in?: number;
     access_token?: string;
     refresh_token?: string;
+    refresh_token_expires_in?: number;
     id_token?: string;
     client_info?: string;
     foci?: string;
     spa_code?: string;
+    spa_accountid?: string;
     key_id?: string;
     // Error
     error?: string;
@@ -47,4 +51,5 @@ export type ServerAuthorizationTokenResponse = {
     timestamp?: string;
     trace_id?: string;
     correlation_id?: string;
+    claims?: string;
 };

@@ -3,12 +3,15 @@
  * Licensed under the MIT License.
  */
 
-import { DataProtectionScope } from "./DataProtectionScope";
+import type { LoggerOptions } from "@azure/msal-common/node";
+
+import { DataProtectionScope } from "./DataProtectionScope.js";
 
 export interface IPersistenceConfiguration {
-    cachePath?: string,
-    dataProtectionScope?: DataProtectionScope,
-    serviceName?: string,
-    accountName?: string,
-    usePlaintextFileOnLinux?: boolean,
+    cachePath?: string;
+    dataProtectionScope?: DataProtectionScope;
+    serviceName?: string;
+    accountName?: string;
+    usePlaintextFileOnLinux?: boolean;
+    loggerOptions?: LoggerOptions;
 }

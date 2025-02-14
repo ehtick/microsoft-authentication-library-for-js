@@ -1,9 +1,12 @@
-import { ComponentFixtureAutoDetect, fakeAsync, TestBed } from '@angular/core/testing';
-import { IPublicClientApplication, PublicClientApplication } from "@azure/msal-browser";
-import { MsalModule } from './msal.module';
-import { MsalService } from './msal.service';
-import { MsalRedirectComponent } from './msal.redirect.component';
-import { MsalBroadcastService } from './msal.broadcast.service';
+import { TestBed } from "@angular/core/testing";
+import {
+  IPublicClientApplication,
+  PublicClientApplication,
+} from "@azure/msal-browser";
+import { MsalBroadcastService } from "./msal.broadcast.service";
+import { MsalModule } from "./msal.module";
+import { MsalRedirectComponent } from "./msal.redirect.component";
+import { MsalService } from "./msal.service";
 
 let authService: MsalService;
 let broadcastService: MsalBroadcastService;
@@ -11,8 +14,8 @@ let broadcastService: MsalBroadcastService;
 function MSALInstanceFactory(): IPublicClientApplication {
   return new PublicClientApplication({
     auth: {
-      clientId: '6226576d-37e9-49eb-b201-ec1eeb0029b6',
-      redirectUri: 'http://localhost:4200'
+      clientId: "b5c2e510-4a17-4feb-b219-e55aa5b74144",
+      redirectUri: "http://localhost:4200",
     },
   });
 }
@@ -22,9 +25,7 @@ function initializeMsal() {
 
   TestBed.configureTestingModule({
     declarations: [MsalRedirectComponent],
-    imports: [
-      MsalModule.forRoot(MSALInstanceFactory(), null, null)
-    ],
+    imports: [MsalModule.forRoot(MSALInstanceFactory(), null, null)],
     providers: [],
   });
 
@@ -32,30 +33,31 @@ function initializeMsal() {
   broadcastService = TestBed.inject(MsalBroadcastService);
 }
 
-describe('MsalRedirectComponent', () => {
+describe("MsalRedirectComponent", () => {
   beforeAll(initializeMsal);
 
-  it('calls handleRedirectObservable on ngInit', (done) => {
+  it("calls handleRedirectObservable on ngInit", (done) => {
     const sampleAccessToken = {
-      accessToken: "123abc"
+      accessToken: "123abc",
     };
 
-    spyOn(PublicClientApplication.prototype, "initialize").and.returnValue((
-      Promise.resolve()
-    ));
-    spyOn(PublicClientApplication.prototype, "handleRedirectPromise").and.callFake(() => {
+    spyOn(
+      PublicClientApplication.prototype,
+      "handleRedirectPromise"
+    ).and.callFake(() => {
       return new Promise((resolve) => {
-        console.log("Spy called")
+        console.log("Spy called");
         //@ts-ignore
         resolve(sampleAccessToken);
 
-        expect(PublicClientApplication.prototype.initialize).toHaveBeenCalled();
-        expect(PublicClientApplication.prototype.handleRedirectPromise).toHaveBeenCalled();
+        expect(
+          PublicClientApplication.prototype.handleRedirectPromise
+        ).toHaveBeenCalled();
         done();
       });
     });
-    
+
     const component = new MsalRedirectComponent(authService);
     component.ngOnInit();
-  })
-})
+  });
+});

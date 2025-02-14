@@ -3,11 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import { ICrypto, PkceCodes } from "@azure/msal-common";
-import { GuidGenerator } from "./GuidGenerator";
-import { EncodingUtils } from "../utils/EncodingUtils";
-import { PkceGenerator } from "./PkceGenerator";
-import { HashUtils } from "./HashUtils";
+import { ICrypto, PkceCodes } from "@azure/msal-common/node";
+import { GuidGenerator } from "./GuidGenerator.js";
+import { EncodingUtils } from "../utils/EncodingUtils.js";
+import { PkceGenerator } from "./PkceGenerator.js";
+import { HashUtils } from "./HashUtils.js";
 
 /**
  * This class implements MSAL node's crypto interface, which allows it to perform base64 encoding and decoding, generating cryptographically random GUIDs and
@@ -24,6 +24,21 @@ export class CryptoProvider implements ICrypto {
         this.pkceGenerator = new PkceGenerator();
         this.guidGenerator = new GuidGenerator();
         this.hashUtils = new HashUtils();
+    }
+
+    /**
+     * base64 URL safe encoded string
+     */
+    base64UrlEncode(): string {
+        throw new Error("Method not implemented.");
+    }
+    /**
+     * Stringifies and base64Url encodes input public key
+     * @param inputKid - public key id
+     * @returns Base64Url encoded public key
+     */
+    encodeKid(): string {
+        throw new Error("Method not implemented.");
     }
 
     /**
@@ -66,7 +81,7 @@ export class CryptoProvider implements ICrypto {
 
     /**
      * Removes cryptographic keypair from key store matching the keyId passed in
-     * @param kid 
+     * @param kid - public key id
      */
     removeTokenBindingKey(): Promise<boolean> {
         throw new Error("Method not implemented.");
@@ -91,8 +106,8 @@ export class CryptoProvider implements ICrypto {
      */
     async hashString(plainText: string): Promise<string> {
         return EncodingUtils.base64EncodeUrl(
-            this.hashUtils.sha256(plainText).toString("base64"), 
-            "base64" 
+            this.hashUtils.sha256(plainText).toString("base64"),
+            "base64"
         );
     }
 }

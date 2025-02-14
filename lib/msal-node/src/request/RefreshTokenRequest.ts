@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { CommonRefreshTokenRequest } from "@azure/msal-common";
+import { CommonRefreshTokenRequest } from "@azure/msal-common/node";
 
 /**
  * CommonRefreshTokenRequest
@@ -16,7 +16,18 @@ import { CommonRefreshTokenRequest } from "@azure/msal-common";
  * - forceCache              - Force MSAL to cache a refresh token flow response when there is no account in the cache. Used for migration scenarios.
  * @public
  */
-export type RefreshTokenRequest = Partial<Omit<CommonRefreshTokenRequest, "scopes"|"refreshToken"|"authenticationScheme"|"resourceRequestMethod"|"resourceRequestUri"|"requestedClaimsHash">> & {
+export type RefreshTokenRequest = Partial<
+    Omit<
+        CommonRefreshTokenRequest,
+        | "scopes"
+        | "refreshToken"
+        | "authenticationScheme"
+        | "resourceRequestMethod"
+        | "resourceRequestUri"
+        | "requestedClaimsHash"
+        | "storeInCache"
+    >
+> & {
     scopes: Array<string>;
     refreshToken: string;
     forceCache?: boolean;

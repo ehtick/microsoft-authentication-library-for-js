@@ -3,22 +3,26 @@
  * Licensed under the MIT License.
  */
 
-import { INetworkModule } from "../network/INetworkModule";
-import { DEFAULT_CRYPTO_IMPLEMENTATION, ICrypto } from "../crypto/ICrypto";
-import { AuthError } from "../error/AuthError";
-import { ILoggerCallback, LogLevel } from "../logger/Logger";
-import { Constants } from "../utils/Constants";
-import { version } from "../packageMetadata";
-import { Authority } from "../authority/Authority";
-import { AzureCloudInstance } from "../authority/AuthorityOptions";
-import { CacheManager, DefaultStorageClass } from "../cache/CacheManager";
-import { ServerTelemetryManager } from "../telemetry/server/ServerTelemetryManager";
-import { ICachePlugin } from "../cache/interface/ICachePlugin";
-import { ISerializableTokenCache } from "../cache/interface/ISerializableTokenCache";
-import { ClientCredentials } from "../account/ClientCredentials";
-
-// Token renewal offset default in seconds
-const DEFAULT_TOKEN_RENEWAL_OFFSET_SEC = 300;
+import { INetworkModule } from "../network/INetworkModule.js";
+import { DEFAULT_CRYPTO_IMPLEMENTATION, ICrypto } from "../crypto/ICrypto.js";
+import { ILoggerCallback, Logger, LogLevel } from "../logger/Logger.js";
+import {
+    Constants,
+    DEFAULT_TOKEN_RENEWAL_OFFSET_SEC,
+} from "../utils/Constants.js";
+import { version } from "../packageMetadata.js";
+import { Authority } from "../authority/Authority.js";
+import { AzureCloudInstance } from "../authority/AuthorityOptions.js";
+import { CacheManager, DefaultStorageClass } from "../cache/CacheManager.js";
+import { ServerTelemetryManager } from "../telemetry/server/ServerTelemetryManager.js";
+import { ICachePlugin } from "../cache/interface/ICachePlugin.js";
+import { ISerializableTokenCache } from "../cache/interface/ISerializableTokenCache.js";
+import { ClientCredentials } from "../account/ClientCredentials.js";
+import { ProtocolMode } from "../authority/ProtocolMode.js";
+import {
+    ClientAuthErrorCodes,
+    createClientAuthError,
+} from "../error/ClientAuthError.js";
 
 /**
  * Use the configuration object to configure MSAL Modules and initialize the base interfaces for MSAL.
@@ -33,35 +37,38 @@ const DEFAULT_TOKEN_RENEWAL_OFFSET_SEC = 300;
  * - storageInterface           - Storage implementation
  * - systemOptions              - Additional library options
  * - clientCredentials          - Credentials options for confidential clients
+ * @internal
  */
 export type ClientConfiguration = {
-    authOptions: AuthOptions,
-    systemOptions?: SystemOptions,
-    loggerOptions?: LoggerOptions,
-    storageInterface?: CacheManager,
-    networkInterface?: INetworkModule,
-    cryptoInterface?: ICrypto,
-    clientCredentials?: ClientCredentials,
-    libraryInfo?: LibraryInfo
-    telemetry?: TelemetryOptions,
-    serverTelemetryManager?: ServerTelemetryManager | null,
-    persistencePlugin?: ICachePlugin | null,
-    serializableCache?: ISerializableTokenCache | null,        
+    authOptions: AuthOptions;
+    systemOptions?: SystemOptions;
+    loggerOptions?: LoggerOptions;
+    cacheOptions?: CacheOptions;
+    storageInterface?: CacheManager;
+    networkInterface?: INetworkModule;
+    cryptoInterface?: ICrypto;
+    clientCredentials?: ClientCredentials;
+    libraryInfo?: LibraryInfo;
+    telemetry?: TelemetryOptions;
+    serverTelemetryManager?: ServerTelemetryManager | null;
+    persistencePlugin?: ICachePlugin | null;
+    serializableCache?: ISerializableTokenCache | null;
 };
 
 export type CommonClientConfiguration = {
-    authOptions: Required<AuthOptions>,
-    systemOptions: Required<SystemOptions>,
-    loggerOptions : Required<LoggerOptions>,
-    storageInterface: CacheManager,
-    networkInterface : INetworkModule,
-    cryptoInterface : Required<ICrypto>,
-    libraryInfo : LibraryInfo,
-    telemetry: Required<TelemetryOptions>,
-    serverTelemetryManager: ServerTelemetryManager | null,
-    clientCredentials: ClientCredentials,
-    persistencePlugin: ICachePlugin | null,
-    serializableCache: ISerializableTokenCache | null,     
+    authOptions: Required<AuthOptions>;
+    systemOptions: Required<SystemOptions>;
+    loggerOptions: Required<LoggerOptions>;
+    cacheOptions: Required<CacheOptions>;
+    storageInterface: CacheManager;
+    networkInterface: INetworkModule;
+    cryptoInterface: Required<ICrypto>;
+    libraryInfo: LibraryInfo;
+    telemetry: Required<TelemetryOptions>;
+    serverTelemetryManager: ServerTelemetryManager | null;
+    clientCredentials: ClientCredentials;
+    persistencePlugin: ICachePlugin | null;
+    serializableCache: ISerializableTokenCache | null;
 };
 
 /**
@@ -73,14 +80,19 @@ export type CommonClientConfiguration = {
  * - cloudDiscoveryMetadata      - A string containing the cloud discovery response. Used in AAD scenarios.
  * - clientCapabilities          - Array of capabilities which will be added to the claims.access_token.xms_cc request property on every network request.
  * - protocolMode                - Enum that represents the protocol that msal follows. Used for configuring proper endpoints.
- * - skipAuthorityMetadataCache      - A flag to choose whether to use or not use the local metadata cache during authority initialization. Defaults to false.
+ * - skipAuthorityMetadataCache  - A flag to choose whether to use or not use the local metadata cache during authority initialization. Defaults to false.
+ * - instanceAware               - A flag of whether the STS will send back additional parameters to specify where the tokens should be retrieved from.
+ * - redirectUri                 - The redirect URI where authentication responses can be received by your application. It must exactly match one of the redirect URIs registered in the Azure portal.
+ * @internal
  */
 export type AuthOptions = {
     clientId: string;
     authority: Authority;
+    redirectUri: string;
     clientCapabilities?: Array<string>;
     azureCloudOptions?: AzureCloudOptions;
     skipAuthorityMetadataCache?: boolean;
+    instanceAware?: boolean;
 };
 
 /**
@@ -91,7 +103,6 @@ export type AuthOptions = {
 export type SystemOptions = {
     tokenRenewalOffsetSeconds?: number;
     preventCorsPreflight?: boolean;
-    proxyUrl?: string;
 };
 
 /**
@@ -103,20 +114,29 @@ export type SystemOptions = {
  * - correlationId                 - Sets the correlationId printed by the logger
  */
 export type LoggerOptions = {
-    loggerCallback?: ILoggerCallback,
-    piiLoggingEnabled?: boolean,
-    logLevel?: LogLevel,
-    correlationId?: string
+    loggerCallback?: ILoggerCallback;
+    piiLoggingEnabled?: boolean;
+    logLevel?: LogLevel;
+    correlationId?: string;
+};
+
+/**
+ *  Use this to configure credential cache preferences in the ClientConfiguration object
+ *
+ * - claimsBasedCachingEnabled   - Sets whether tokens should be cached based on the claims hash. Default is false.
+ */
+export type CacheOptions = {
+    claimsBasedCachingEnabled?: boolean;
 };
 
 /**
  * Library-specific options
  */
 export type LibraryInfo = {
-    sku: string,
-    version: string,
-    cpu: string,
-    os: string
+    sku: string;
+    version: string;
+    cpu: string;
+    os: string;
 };
 
 /**
@@ -127,7 +147,7 @@ export type LibraryInfo = {
  */
 export type AzureCloudOptions = {
     azureCloudInstance: AzureCloudInstance;
-    tenant?: string,
+    tenant?: string;
 };
 
 export type TelemetryOptions = {
@@ -147,7 +167,6 @@ export type ApplicationTelemetry = {
 export const DEFAULT_SYSTEM_OPTIONS: Required<SystemOptions> = {
     tokenRenewalOffsetSeconds: DEFAULT_TOKEN_RENEWAL_OFFSET_SEC,
     preventCorsPreflight: false,
-    proxyUrl: Constants.EMPTY_STRING
 };
 
 const DEFAULT_LOGGER_IMPLEMENTATION: Required<LoggerOptions> = {
@@ -156,42 +175,44 @@ const DEFAULT_LOGGER_IMPLEMENTATION: Required<LoggerOptions> = {
     },
     piiLoggingEnabled: false,
     logLevel: LogLevel.Info,
-    correlationId: Constants.EMPTY_STRING
+    correlationId: Constants.EMPTY_STRING,
+};
+
+const DEFAULT_CACHE_OPTIONS: Required<CacheOptions> = {
+    claimsBasedCachingEnabled: false,
 };
 
 const DEFAULT_NETWORK_IMPLEMENTATION: INetworkModule = {
     async sendGetRequestAsync<T>(): Promise<T> {
-        const notImplErr = "Network interface - sendGetRequestAsync() has not been implemented";
-        throw AuthError.createUnexpectedError(notImplErr);
+        throw createClientAuthError(ClientAuthErrorCodes.methodNotImplemented);
     },
     async sendPostRequestAsync<T>(): Promise<T> {
-        const notImplErr = "Network interface - sendPostRequestAsync() has not been implemented";
-        throw AuthError.createUnexpectedError(notImplErr);
-    }
+        throw createClientAuthError(ClientAuthErrorCodes.methodNotImplemented);
+    },
 };
 
 const DEFAULT_LIBRARY_INFO: LibraryInfo = {
     sku: Constants.SKU,
     version: version,
     cpu: Constants.EMPTY_STRING,
-    os: Constants.EMPTY_STRING
+    os: Constants.EMPTY_STRING,
 };
 
 const DEFAULT_CLIENT_CREDENTIALS: ClientCredentials = {
     clientSecret: Constants.EMPTY_STRING,
-    clientAssertion: undefined
+    clientAssertion: undefined,
 };
 
 const DEFAULT_AZURE_CLOUD_OPTIONS: AzureCloudOptions = {
     azureCloudInstance: AzureCloudInstance.None,
-    tenant: `${Constants.DEFAULT_COMMON_TENANT}`
+    tenant: `${Constants.DEFAULT_COMMON_TENANT}`,
 };
 
 const DEFAULT_TELEMETRY_OPTIONS: Required<TelemetryOptions> = {
     application: {
         appName: "",
-        appVersion: ""
-    }
+        appVersion: "",
+    },
 };
 
 /**
@@ -201,37 +222,47 @@ const DEFAULT_TELEMETRY_OPTIONS: Required<TelemetryOptions> = {
  *
  * @returns Configuration
  */
-export function buildClientConfiguration(
-    {
-        authOptions: userAuthOptions,
-        systemOptions: userSystemOptions,
-        loggerOptions: userLoggerOption,
-        storageInterface: storageImplementation,
-        networkInterface: networkImplementation,
-        cryptoInterface: cryptoImplementation,
-        clientCredentials: clientCredentials,
-        libraryInfo: libraryInfo,
-        telemetry: telemetry,
-        serverTelemetryManager: serverTelemetryManager,
-        persistencePlugin: persistencePlugin,
-        serializableCache: serializableCache,                 
-    }: ClientConfiguration): CommonClientConfiguration {
-
-    const loggerOptions = { ...DEFAULT_LOGGER_IMPLEMENTATION, ...userLoggerOption };
+export function buildClientConfiguration({
+    authOptions: userAuthOptions,
+    systemOptions: userSystemOptions,
+    loggerOptions: userLoggerOption,
+    cacheOptions: userCacheOptions,
+    storageInterface: storageImplementation,
+    networkInterface: networkImplementation,
+    cryptoInterface: cryptoImplementation,
+    clientCredentials: clientCredentials,
+    libraryInfo: libraryInfo,
+    telemetry: telemetry,
+    serverTelemetryManager: serverTelemetryManager,
+    persistencePlugin: persistencePlugin,
+    serializableCache: serializableCache,
+}: ClientConfiguration): CommonClientConfiguration {
+    const loggerOptions = {
+        ...DEFAULT_LOGGER_IMPLEMENTATION,
+        ...userLoggerOption,
+    };
 
     return {
         authOptions: buildAuthOptions(userAuthOptions),
         systemOptions: { ...DEFAULT_SYSTEM_OPTIONS, ...userSystemOptions },
         loggerOptions: loggerOptions,
-        storageInterface: storageImplementation || new DefaultStorageClass(userAuthOptions.clientId, DEFAULT_CRYPTO_IMPLEMENTATION),
-        networkInterface: networkImplementation || DEFAULT_NETWORK_IMPLEMENTATION,
+        cacheOptions: { ...DEFAULT_CACHE_OPTIONS, ...userCacheOptions },
+        storageInterface:
+            storageImplementation ||
+            new DefaultStorageClass(
+                userAuthOptions.clientId,
+                DEFAULT_CRYPTO_IMPLEMENTATION,
+                new Logger(loggerOptions)
+            ),
+        networkInterface:
+            networkImplementation || DEFAULT_NETWORK_IMPLEMENTATION,
         cryptoInterface: cryptoImplementation || DEFAULT_CRYPTO_IMPLEMENTATION,
         clientCredentials: clientCredentials || DEFAULT_CLIENT_CREDENTIALS,
         libraryInfo: { ...DEFAULT_LIBRARY_INFO, ...libraryInfo },
         telemetry: { ...DEFAULT_TELEMETRY_OPTIONS, ...telemetry },
         serverTelemetryManager: serverTelemetryManager || null,
         persistencePlugin: persistencePlugin || null,
-        serializableCache: serializableCache || null,              
+        serializableCache: serializableCache || null,
     };
 }
 
@@ -244,6 +275,17 @@ function buildAuthOptions(authOptions: AuthOptions): Required<AuthOptions> {
         clientCapabilities: [],
         azureCloudOptions: DEFAULT_AZURE_CLOUD_OPTIONS,
         skipAuthorityMetadataCache: false,
-        ...authOptions
+        instanceAware: false,
+        ...authOptions,
     };
+}
+
+/**
+ * Returns true if config has protocolMode set to ProtocolMode.OIDC, false otherwise
+ * @param ClientConfiguration
+ */
+export function isOidcProtocolMode(config: ClientConfiguration): boolean {
+    return (
+        config.authOptions.authority.options.protocolMode === ProtocolMode.OIDC
+    );
 }

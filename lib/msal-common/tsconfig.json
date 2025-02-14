@@ -6,8 +6,12 @@
         "compilerOptions": {
             "moduleResolution": "node",
             "module": "commonjs",
-            "target": "es5",
-            "lib": ["es2015", "dom", "es2015.promise"],
+            "target": "es2020",
+            "lib": [
+                "es2020",
+                "dom",
+                "es2020.promise"
+            ],
             "outDir": "./dist",
             "esModuleInterop": true,
             "resolveJsonModule": true,
@@ -17,22 +21,23 @@
             "strictPropertyInitialization": false,
             "noImplicitThis": true,
             "noUnusedLocals": true,
-            "noUnusedParameters": false,
+            "noUnusedParameters": true,
             "noImplicitAny": false,
             "noFallthroughCasesInSwitch": true
         }
     },
     "compilerOptions": {
-        "moduleResolution": "node",
-        "module": "es6",
-        "target": "es5",
+        "moduleResolution": "nodenext",
+        "module": "nodenext",
+        "target": "es2020",
         "lib": [
-            "es2015",
+            "es2020",
             "dom",
-            "es2015.promise"
+            "es2020.promise"
         ],
         "outDir": "./dist",
         "allowUnusedLabels": false,
+        "composite": false,
         "noImplicitReturns": true,
         "esModuleInterop": true,
         "resolveJsonModule": true,
@@ -45,15 +50,18 @@
         "alwaysStrict": true,
         "noUnusedLocals": true,
         "noUnusedParameters": false,
-        "noFallthroughCasesInSwitch": true
+        "noFallthroughCasesInSwitch": true,
+        "types": [
+            "node",
+            "jest"
+        ]
     },
-    "include": ["src", "test", "scripts"],
+    "include": [
+        "src",
+        "test",
+        "scripts"
+    ],
     "exclude": [
         "node_modules"
-    ],
-    "types": [
-        "node",
-        "jest"
     ]
 }
-
