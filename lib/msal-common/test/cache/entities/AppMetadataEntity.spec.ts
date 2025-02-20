@@ -1,30 +1,39 @@
-import { AppMetadataEntity } from "../../../src/cache/entities/AppMetadataEntity";
 import { mockAppMetaDataEntity, mockIdTokenEntity } from "./cacheConstants";
 import { IdTokenEntity } from "../../../src/cache/entities/IdTokenEntity";
+import { CacheHelpers } from "../../../src";
+import { TEST_CONFIG } from "../../test_kit/StringConstants";
 
 describe("AppMetadataEntity.ts Unit Tests", () => {
-    it("Verify an AppMetadataEntity", () => {
-        const appM = new AppMetadataEntity();
-        expect(appM instanceof AppMetadataEntity);
-    });
-
     it("Create an AppMetadataEntity", () => {
-        const appM = new AppMetadataEntity();
-        Object.assign(appM, mockAppMetaDataEntity);
-        expect(appM.generateAppMetadataKey()).toEqual("appmetadata-login.microsoftonline.com-mock_client_id");
+        expect(
+            CacheHelpers.generateAppMetadataKey({
+                clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+                environment: TEST_CONFIG.validAuthorityHost,
+                familyId: TEST_CONFIG.THE_FAMILY_ID,
+            })
+        ).toEqual(
+            `appmetadata-${TEST_CONFIG.validAuthorityHost}-${TEST_CONFIG.MSAL_CLIENT_ID}`
+        );
     });
 
     it("verify if an object is an appMetadata  entity", () => {
-        const appM = new AppMetadataEntity();
-        Object.assign(appM, mockAppMetaDataEntity);
-        const key = appM.generateAppMetadataKey();
-        expect(AppMetadataEntity.isAppMetadataEntity(key, mockAppMetaDataEntity)).toEqual(true);
+        const appM = {
+            clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+            environment: TEST_CONFIG.validAuthorityHost,
+            familyId: TEST_CONFIG.THE_FAMILY_ID,
+        };
+        const key = CacheHelpers.generateAppMetadataKey(appM);
+        expect(
+            CacheHelpers.isAppMetadataEntity(key, mockAppMetaDataEntity)
+        ).toEqual(true);
     });
 
     it("verify if an object is not an appMetadata entity", () => {
-        const idT = new IdTokenEntity();
-        Object.assign(idT, mockIdTokenEntity);
-        const key = idT.generateCredentialKey();
-        expect(AppMetadataEntity.isAppMetadataEntity(key, mockIdTokenEntity)).toEqual(false);
+        const key = CacheHelpers.generateCredentialKey(
+            mockIdTokenEntity as IdTokenEntity
+        );
+        expect(
+            CacheHelpers.isAppMetadataEntity(key, mockIdTokenEntity)
+        ).toEqual(false);
     });
 });

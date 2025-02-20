@@ -3,21 +3,26 @@
  * Licensed under the MIT License.
  */
 
-import puppeteer from "puppeteer";
-import { Screenshot, createFolder, setupCredentials, b2cMsaAccountEnterCredentials, ONE_SECOND_IN_MS } from "../../../e2eTestUtils/TestUtils";
-import { NodeCacheTestUtils } from "../../../e2eTestUtils/NodeCacheTestUtils";
-import { LabClient } from "../../../e2eTestUtils/LabClient";
-import { LabApiQueryParams } from "../../../e2eTestUtils/LabApiQueryParams";
-import { B2cProviders, UserTypes } from "../../../e2eTestUtils/Constants";
+import * as puppeteer from "puppeteer";
 import {
+    Screenshot,
+    createFolder,
+    setupCredentials,
+    b2cMsaAccountEnterCredentials,
+    ONE_SECOND_IN_MS,
+    RETRY_TIMES,
     clickSignIn,
-    SCREENSHOT_BASE_FOLDER_NAME,
     SAMPLE_HOME_URL,
     SUCCESSFUL_GET_ALL_ACCOUNTS_ID,
-    validateCacheLocation
-} from "../../testUtils";
-
-import { PublicClientApplication, TokenCache } from "../../../../lib/msal-node/dist";
+    validateCacheLocation,
+    NodeCacheTestUtils,
+    LabClient,
+    LabApiQueryParams,
+    B2cProviders,
+    UserTypes,
+} from "e2e-test-utils";
+import path from "path";
+import { PublicClientApplication, TokenCache } from "@azure/msal-node";
 
 // Set test cache name/location
 const TEST_CACHE_LOCATION = `${__dirname}/data/b2c-msa.cache.json`;
@@ -32,8 +37,8 @@ const cachePlugin = require("../../cachePlugin.js")(TEST_CACHE_LOCATION);
 const config = require("../config/B2C-MSA.json");
 
 describe("Silent Flow B2C Tests (msa account)", () => {
-    jest.retryTimes(1);
-    jest.setTimeout(ONE_SECOND_IN_MS*45);
+    jest.retryTimes(RETRY_TIMES);
+    jest.setTimeout(ONE_SECOND_IN_MS * 45);
     let browser: puppeteer.Browser;
     let context: puppeteer.BrowserContext;
     let page: puppeteer.Page;
@@ -47,7 +52,7 @@ describe("Silent Flow B2C Tests (msa account)", () => {
     let username: string;
     let accountPwd: string;
 
-    const screenshotFolder = `${SCREENSHOT_BASE_FOLDER_NAME}/silent-flow/b2c/msa-account`;
+    const screenshotFolder = path.join(__dirname, "screenshots/silent-flow/b2c-msa");
 
     beforeAll(async () => {
         await validateCacheLocation(TEST_CACHE_LOCATION);
@@ -58,21 +63,34 @@ describe("Silent Flow B2C Tests (msa account)", () => {
         port = 3008;
         homeRoute = `${SAMPLE_HOME_URL}:${port}`;
 
-        createFolder(SCREENSHOT_BASE_FOLDER_NAME);
+        createFolder(screenshotFolder);
 
         const labApiParms: LabApiQueryParams = {
             userType: UserTypes.B2C,
-            b2cProvider: B2cProviders.TWITTER
+            b2cProvider: B2cProviders.MICROSOFT,
         };
 
         const labClient = new LabClient();
-        const envResponse = await labClient.getVarsByCloudEnvironment(labApiParms);
-        [username, accountPwd] = await setupCredentials(envResponse[0], labClient);
+        const envResponse = await labClient.getVarsByCloudEnvironment(
+            labApiParms
+        );
+        [username, accountPwd] = await setupCredentials(
+            envResponse[0],
+            labClient
+        );
 
-        publicClientApplication = new PublicClientApplication({ auth: config.authOptions, cache: { cachePlugin } });
+        publicClientApplication = new PublicClientApplication({
+            auth: config.authOptions,
+            cache: { cachePlugin },
+        });
 
         msalTokenCache = publicClientApplication.getTokenCache();
-        server = getTokenSilent(config, publicClientApplication, port, msalTokenCache);
+        server = getTokenSilent(
+            config,
+            publicClientApplication,
+            port,
+            msalTokenCache
+        );
         await NodeCacheTestUtils.resetCache(TEST_CACHE_LOCATION);
     });
 
@@ -85,9 +103,9 @@ describe("Silent Flow B2C Tests (msa account)", () => {
 
     describe("AcquireToken", () => {
         beforeEach(async () => {
-            context = await browser.createIncognitoBrowserContext();
+            context = await browser.createBrowserContext();
             page = await context.newPage();
-            page.setDefaultTimeout(ONE_SECOND_IN_MS*5);
+            page.setDefaultTimeout(ONE_SECOND_IN_MS * 5);
             await page.goto(homeRoute, { waitUntil: "networkidle0" });
         });
 
@@ -98,63 +116,104 @@ describe("Silent Flow B2C Tests (msa account)", () => {
         });
 
         it("Performs acquire token with Auth Code flow", async () => {
-            const screenshot = new Screenshot(`${screenshotFolder}/AcquireTokenAuthCode`);
+            const screenshot = new Screenshot(
+                `${screenshotFolder}/AcquireTokenAuthCode`
+            );
             await clickSignIn(page, screenshot);
-            await b2cMsaAccountEnterCredentials(page, screenshot, username, accountPwd);
+            await b2cMsaAccountEnterCredentials(
+                page,
+                screenshot,
+                username,
+                accountPwd
+            );
             await page.waitForSelector("#acquireTokenSilent");
             await page.click("#acquireTokenSilent");
-            const cachedTokens = await NodeCacheTestUtils.waitForTokens(TEST_CACHE_LOCATION, ONE_SECOND_IN_MS*2);
+            const cachedTokens = await NodeCacheTestUtils.waitForTokens(
+                TEST_CACHE_LOCATION,
+                ONE_SECOND_IN_MS * 2
+            );
             expect(cachedTokens.accessTokens.length).toBe(1);
             expect(cachedTokens.idTokens.length).toBe(1);
             expect(cachedTokens.refreshTokens.length).toBe(1);
         });
 
         it("Performs acquire token silent", async () => {
-            const screenshot = new Screenshot(`${screenshotFolder}/AcquireTokenSilent`);
+            const screenshot = new Screenshot(
+                `${screenshotFolder}/AcquireTokenSilent`
+            );
             await clickSignIn(page, screenshot);
-            await b2cMsaAccountEnterCredentials(page, screenshot, username, accountPwd);
+            await b2cMsaAccountEnterCredentials(
+                page,
+                screenshot,
+                username,
+                accountPwd
+            );
             await page.waitForSelector("#acquireTokenSilent");
             await screenshot.takeScreenshot(page, "ATS");
             await page.click("#acquireTokenSilent");
             await page.waitForSelector("#token-acquired-silently");
-            await screenshot.takeScreenshot(page, "acquireTokenSilentGotTokens");
+            await screenshot.takeScreenshot(
+                page,
+                "acquireTokenSilentGotTokens"
+            );
             const htmlBody = await page.evaluate(() => document.body.innerHTML);
-            expect(htmlBody).toContain('Silent token acquisition successful');
+            expect(htmlBody).toContain("Silent token acquisition successful");
         });
 
         it("Refreshes an expired access token", async () => {
-            const screenshot = new Screenshot(`${screenshotFolder}/RefreshExpiredToken`);
+            const screenshot = new Screenshot(
+                `${screenshotFolder}/RefreshExpiredToken`
+            );
             await clickSignIn(page, screenshot);
-            await b2cMsaAccountEnterCredentials(page, screenshot, username, accountPwd);
+            await b2cMsaAccountEnterCredentials(
+                page,
+                screenshot,
+                username,
+                accountPwd
+            );
             await page.waitForSelector("#acquireTokenSilent");
 
-            let tokens = await NodeCacheTestUtils.waitForTokens(TEST_CACHE_LOCATION, ONE_SECOND_IN_MS*2);
+            let tokens = await NodeCacheTestUtils.waitForTokens(
+                TEST_CACHE_LOCATION,
+                ONE_SECOND_IN_MS * 2
+            );
             const originalAccessToken = tokens.accessTokens[0];
             await NodeCacheTestUtils.expireAccessTokens(TEST_CACHE_LOCATION);
-            tokens = await NodeCacheTestUtils.waitForTokens(TEST_CACHE_LOCATION, ONE_SECOND_IN_MS*2);
+            tokens = await NodeCacheTestUtils.waitForTokens(
+                TEST_CACHE_LOCATION,
+                ONE_SECOND_IN_MS * 2
+            );
             const expiredAccessToken = tokens.accessTokens[0];
 
             // Wait to ensure new token has new iat
-            await new Promise(r => setTimeout(r, ONE_SECOND_IN_MS));
+            await new Promise((r) => setTimeout(r, ONE_SECOND_IN_MS));
             await page.click("#acquireTokenSilent");
-            await page.waitForSelector('#token-acquired-silently');
-            tokens = await NodeCacheTestUtils.waitForTokens(TEST_CACHE_LOCATION, ONE_SECOND_IN_MS*2);
+            await page.waitForSelector("#token-acquired-silently");
+            tokens = await NodeCacheTestUtils.waitForTokens(
+                TEST_CACHE_LOCATION,
+                ONE_SECOND_IN_MS * 2
+            );
             const refreshedAccessToken = tokens.accessTokens[0];
-            await screenshot.takeScreenshot(page, "acquireTokenSilentGotTokens");
+            await screenshot.takeScreenshot(
+                page,
+                "acquireTokenSilentGotTokens"
+            );
             const htmlBody = await page.evaluate(() => document.body.innerHTML);
 
-            expect(htmlBody).toContain('Silent token acquisition successful');
+            expect(htmlBody).toContain("Silent token acquisition successful");
             expect(Number(originalAccessToken.expiresOn)).toBeGreaterThan(0);
             expect(Number(expiredAccessToken.expiresOn)).toBe(0);
             expect(Number(refreshedAccessToken.expiresOn)).toBeGreaterThan(0);
-            expect(refreshedAccessToken.secret).not.toEqual(originalAccessToken.secret);
+            expect(refreshedAccessToken.secret).not.toEqual(
+                originalAccessToken.secret
+            );
         });
     });
 
     describe("Get All Accounts", () => {
         describe("Authenticated", () => {
             beforeEach(async () => {
-                context = await browser.createIncognitoBrowserContext();
+                context = await browser.createBrowserContext();
                 page = await context.newPage();
                 await page.goto(homeRoute, { waitUntil: "networkidle0" });
             });
@@ -166,25 +225,45 @@ describe("Silent Flow B2C Tests (msa account)", () => {
             });
 
             it("Gets all cached accounts", async () => {
-                const screenshot = new Screenshot(`${screenshotFolder}/GetAllAccounts`);
+                const screenshot = new Screenshot(
+                    `${screenshotFolder}/GetAllAccounts`
+                );
                 await clickSignIn(page, screenshot);
-                await b2cMsaAccountEnterCredentials(page, screenshot, username, accountPwd);
+                await b2cMsaAccountEnterCredentials(
+                    page,
+                    screenshot,
+                    username,
+                    accountPwd
+                );
                 await page.waitForSelector("#getAllAccounts");
                 await page.click("#getAllAccounts");
-                await page.waitForSelector(`#${SUCCESSFUL_GET_ALL_ACCOUNTS_ID}`);
+                await page.waitForSelector(
+                    `#${SUCCESSFUL_GET_ALL_ACCOUNTS_ID}`
+                );
                 await screenshot.takeScreenshot(page, "gotAllAccounts");
-                const accounts = await page.evaluate(() => JSON.parse(document.getElementById("nav-tabContent").children[0].innerHTML));
-                const htmlBody = await page.evaluate(() => document.body.innerHTML);
+                const accounts = await page.evaluate(() =>
+                    JSON.parse(
+                        document.getElementById("nav-tabContent").children[0]
+                            .innerHTML
+                    )
+                );
+                const htmlBody = await page.evaluate(
+                    () => document.body.innerHTML
+                );
                 expect(htmlBody).toContain(SUCCESSFUL_GET_ALL_ACCOUNTS_ID);
-                expect(htmlBody).not.toContain("No accounts found in the cache.");
-                expect(htmlBody).not.toContain("Failed to get accounts from cache.");
+                expect(htmlBody).not.toContain(
+                    "No accounts found in the cache."
+                );
+                expect(htmlBody).not.toContain(
+                    "Failed to get accounts from cache."
+                );
                 expect(accounts.length).toBe(1);
             });
         });
 
         describe("Unauthenticated", () => {
             beforeEach(async () => {
-                context = await browser.createIncognitoBrowserContext();
+                context = await browser.createBrowserContext();
                 page = await context.newPage();
                 await publicClientApplication.clearCache();
             });
@@ -196,18 +275,30 @@ describe("Silent Flow B2C Tests (msa account)", () => {
             });
 
             it("Returns empty account array", async () => {
-                const screenshot = new Screenshot(`${screenshotFolder}/NoCachedAccounts`);
-                await page.goto(`${homeRoute}/allAccounts`, { waitUntil: "networkidle0" });
+                const screenshot = new Screenshot(
+                    `${screenshotFolder}/NoCachedAccounts`
+                );
+                await page.goto(`${homeRoute}/allAccounts`, {
+                    waitUntil: "networkidle0",
+                });
                 await page.waitForSelector("#getAllAccounts");
                 await page.click("#getAllAccounts");
                 await screenshot.takeScreenshot(page, "gotAllAccounts");
-                const accounts = await page.evaluate(() => JSON.parse(document.getElementById("nav-tabContent").children[0].innerHTML));
-                const htmlBody = await page.evaluate(() => document.body.innerHTML);
+                const accounts = await page.evaluate(() =>
+                    JSON.parse(
+                        document.getElementById("nav-tabContent").children[0]
+                            .innerHTML
+                    )
+                );
+                const htmlBody = await page.evaluate(
+                    () => document.body.innerHTML
+                );
                 expect(htmlBody).toContain("No accounts found in the cache.");
-                expect(htmlBody).not.toContain("Failed to get accounts from cache.");
+                expect(htmlBody).not.toContain(
+                    "Failed to get accounts from cache."
+                );
                 expect(accounts.length).toBe(0);
             });
         });
     });
-
 });

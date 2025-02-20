@@ -3,46 +3,77 @@
  * Licensed under the MIT License.
  */
 
-import { InteractionHandler } from "../../src/interaction_handler/InteractionHandler";
+import { InteractionHandler } from "../../src/interaction_handler/InteractionHandler.js";
 import {
     PkceCodes,
     NetworkRequestOptions,
+    Logger,
     LogLevel,
+    LoggerOptions,
     AccountInfo,
-    AuthorityFactory,
     CommonAuthorizationCodeRequest,
     AuthenticationResult,
     AuthorizationCodeClient,
     AuthenticationScheme,
     ProtocolMode,
-    Logger,
     Authority,
     ClientConfiguration,
     AuthorizationCodePayload,
     AuthorityOptions,
     CcsCredential,
     CcsCredentialType,
-} from "@azure/msal-common";
-import { Configuration, buildConfiguration } from "../../src/config/Configuration";
-import { TEST_CONFIG, TEST_URIS, TEST_DATA_CLIENT_INFO, TEST_TOKENS, TEST_TOKEN_LIFETIMES, TEST_HASHES, TEST_POP_VALUES, TEST_STATE_VALUES, RANDOM_TEST_GUID, TEST_CRYPTO_VALUES } from "../utils/StringConstants";
-import { BrowserAuthError } from "../../src/error/BrowserAuthError";
-import sinon from "sinon";
-import { CryptoOps } from "../../src/crypto/CryptoOps";
-import { TestStorageManager } from "../cache/TestStorageManager";
-import { BrowserCacheManager } from "../../src/cache/BrowserCacheManager";
-import { TemporaryCacheKeys, BrowserConstants } from "../../src/utils/BrowserConstants";
+    StubPerformanceClient,
+} from "@azure/msal-common/browser";
+import {
+    Configuration,
+    buildConfiguration,
+} from "../../src/config/Configuration.js";
+import {
+    TEST_CONFIG,
+    TEST_URIS,
+    TEST_DATA_CLIENT_INFO,
+    TEST_TOKENS,
+    TEST_TOKEN_LIFETIMES,
+    TEST_HASHES,
+    TEST_POP_VALUES,
+    TEST_STATE_VALUES,
+    RANDOM_TEST_GUID,
+    TEST_CRYPTO_VALUES,
+} from "../utils/StringConstants.js";
+import {
+    createBrowserAuthError,
+    BrowserAuthErrorCodes,
+} from "../../src/error/BrowserAuthError.js";
+import { CryptoOps } from "../../src/crypto/CryptoOps.js";
+import { TestStorageManager } from "../cache/TestStorageManager.js";
+import { BrowserCacheManager } from "../../src/cache/BrowserCacheManager.js";
+import {
+    TemporaryCacheKeys,
+    BrowserConstants,
+} from "../../src/utils/BrowserConstants.js";
+import { EventHandler } from "../../src/event/EventHandler.js";
 
 class TestInteractionHandler extends InteractionHandler {
-
-    constructor(authCodeModule: AuthorizationCodeClient, storageImpl: BrowserCacheManager) {
-        super(authCodeModule, storageImpl, testAuthCodeRequest, testBrowserRequestLogger);
+    constructor(
+        authCodeModule: AuthorizationCodeClient,
+        storageImpl: BrowserCacheManager
+    ) {
+        super(
+            authCodeModule,
+            storageImpl,
+            testAuthCodeRequest,
+            testBrowserRequestLogger,
+            performanceClient
+        );
     }
 
     showUI(requestUrl: string): Window {
         throw new Error("Method not implemented.");
     }
 
-    initiateAuthRequest(requestUrl: string): Window | Promise<HTMLIFrameElement> {
+    initiateAuthRequest(
+        requestUrl: string
+    ): Window | Promise<HTMLIFrameElement> {
         this.authCodeRequest = testAuthCodeRequest;
         //@ts-ignore
         return null;
@@ -51,25 +82,33 @@ class TestInteractionHandler extends InteractionHandler {
 
 const testAuthCodeRequest: CommonAuthorizationCodeRequest = {
     authenticationScheme: AuthenticationScheme.BEARER,
-    authority: "",
+    authority: TEST_CONFIG.validAuthority,
     redirectUri: TEST_URIS.TEST_REDIR_URI,
     scopes: ["scope1", "scope2"],
     code: "",
-    correlationId: ""
+    correlationId: "",
 };
 
-const testBrowserRequestLogger: Logger = new Logger({
-    loggerCallback: (level: LogLevel, message: string, containsPii: boolean): void => {},
-    piiLoggingEnabled: true
-}, "@azure/msal-browser", "test");
+const testBrowserRequestLogger: Logger = new Logger(
+    {
+        loggerCallback: (
+            level: LogLevel,
+            message: string,
+            containsPii: boolean
+        ): void => {},
+        piiLoggingEnabled: true,
+    },
+    "@azure/msal-browser",
+    "test"
+);
 
 const testPkceCodes = {
     challenge: "TestChallenge",
-    verifier: "TestVerifier"
+    verifier: "TestVerifier",
 } as PkceCodes;
 
 const testNetworkResult = {
-    testParam: "testValue"
+    testParam: "testValue",
 };
 
 const networkInterface = {
@@ -91,6 +130,14 @@ const cryptoInterface = {
     base64Encode: (input: string): string => {
         return "testEncodedString";
     },
+    base64UrlEncode(input: string): string {
+        return Buffer.from(input, "utf-8").toString("base64url");
+    },
+    encodeKid(input: string): string {
+        return Buffer.from(JSON.stringify({ kid: input }), "utf-8").toString(
+            "base64url"
+        );
+    },
     generatePkceCodes: async (): Promise<PkceCodes> => {
         return testPkceCodes;
     },
@@ -108,66 +155,111 @@ const cryptoInterface = {
     },
     hashString: async (): Promise<string> => {
         return Promise.resolve(TEST_CRYPTO_VALUES.TEST_SHA256_HASH);
-    }
-}
+    },
+};
+
+const performanceClient = {
+    startMeasurement: jest.fn(),
+    endMeasurement: jest.fn(),
+    discardMeasurements: jest.fn(),
+    removePerformanceCallback: jest.fn(),
+    addPerformanceCallback: jest.fn(),
+    emitEvents: jest.fn(),
+    startPerformanceMeasurement: jest.fn(),
+    generateId: jest.fn(),
+    calculateQueuedTime: jest.fn(),
+    addQueueMeasurement: jest.fn(),
+    setPreQueueTime: jest.fn(),
+    addFields: jest.fn(),
+    incrementFields: jest.fn(),
+};
 
 let authorityInstance: Authority;
 let authConfig: ClientConfiguration;
 
 describe("InteractionHandler.ts Unit Tests", () => {
-
     let authCodeModule: AuthorizationCodeClient;
     let browserStorage: BrowserCacheManager;
     const cryptoOpts = new CryptoOps(testBrowserRequestLogger);
 
-    beforeEach(() => {
+    beforeEach(async () => {
         const appConfig: Configuration = {
             auth: {
-                clientId: TEST_CONFIG.MSAL_CLIENT_ID
-            }
+                clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+            },
         };
         const configObj = buildConfiguration(appConfig, true);
         const authorityOptions: AuthorityOptions = {
             protocolMode: ProtocolMode.AAD,
             knownAuthorities: [configObj.auth.authority],
             cloudDiscoveryMetadata: "",
-            authorityMetadata: ""
-        }
-        authorityInstance = AuthorityFactory.createInstance(configObj.auth.authority, networkInterface, browserStorage, authorityOptions);
+            authorityMetadata: "",
+        };
+        const loggerOptions: LoggerOptions = {
+            loggerCallback: (): void => {},
+            piiLoggingEnabled: true,
+        };
+        const logger: Logger = new Logger(loggerOptions);
+        browserStorage = new BrowserCacheManager(
+            TEST_CONFIG.MSAL_CLIENT_ID,
+            configObj.cache,
+            cryptoOpts,
+            logger,
+            new StubPerformanceClient(),
+            new EventHandler()
+        );
+        authorityInstance = new Authority(
+            configObj.auth.authority,
+            networkInterface,
+            browserStorage,
+            authorityOptions,
+            logger,
+            TEST_CONFIG.CORRELATION_ID
+        );
+        await authorityInstance.resolveEndpointsAsync();
         authConfig = {
             authOptions: {
                 ...configObj.auth,
                 authority: authorityInstance,
             },
             systemOptions: {
-                tokenRenewalOffsetSeconds: configObj.system.tokenRenewalOffsetSeconds
+                tokenRenewalOffsetSeconds:
+                    configObj.system.tokenRenewalOffsetSeconds,
             },
             cryptoInterface: cryptoInterface,
-            storageInterface: new TestStorageManager(TEST_CONFIG.MSAL_CLIENT_ID, cryptoInterface),
+            storageInterface: new TestStorageManager(
+                TEST_CONFIG.MSAL_CLIENT_ID,
+                cryptoInterface,
+                logger
+            ),
             networkInterface: {
-                sendGetRequestAsync: async (url: string, options?: NetworkRequestOptions): Promise<any> => {
+                sendGetRequestAsync: async (
+                    url: string,
+                    options?: NetworkRequestOptions
+                ): Promise<any> => {
                     return testNetworkResult;
                 },
-                sendPostRequestAsync: async (url: string, options?: NetworkRequestOptions): Promise<any> => {
+                sendPostRequestAsync: async (
+                    url: string,
+                    options?: NetworkRequestOptions
+                ): Promise<any> => {
                     return testNetworkResult;
-                }
+                },
             },
-            loggerOptions: {
-                loggerCallback: (level: LogLevel, message: string, containsPii: boolean): void => {},
-                piiLoggingEnabled: true
-            }
+            loggerOptions: loggerOptions,
         };
         authCodeModule = new AuthorizationCodeClient(authConfig);
-        const logger = new Logger(authConfig.loggerOptions!);
-        browserStorage = new BrowserCacheManager(TEST_CONFIG.MSAL_CLIENT_ID, configObj.cache, cryptoOpts, logger);
     });
 
     afterEach(() => {
-        sinon.restore();
+        jest.restoreAllMocks();
     });
 
     it("Constructor", () => {
-        const interactionHandler = new TestInteractionHandler(authCodeModule, browserStorage);
+        const interactionHandler = new TestInteractionHandler(
+            authCodeModule,
+            browserStorage
+        );
 
         expect(interactionHandler).toBeInstanceOf(TestInteractionHandler);
         expect(interactionHandler).toBeInstanceOf(InteractionHandler);
@@ -176,32 +268,31 @@ describe("InteractionHandler.ts Unit Tests", () => {
     describe("handleCodeResponseFromServer()", () => {
         it("successfully handle code from server response", async () => {
             const idTokenClaims = {
-                "ver": "2.0",
-                "iss": `${TEST_URIS.DEFAULT_INSTANCE}9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`,
-                "sub": "AAAAAAAAAAAAAAAAAAAAAIkzqFVrSaSaFHy782bbtaQ",
-                "exp": "1536361411",
-                "name": "Abe Lincoln",
-                "preferred_username": "AbeLi@microsoft.com",
-                "oid": "00000000-0000-0000-66f3-3332eca7ea81",
-                "tid": "3338040d-6c67-4c5b-b112-36a304b66dad",
-                "nonce": "123523"
+                ver: "2.0",
+                iss: `${TEST_URIS.DEFAULT_INSTANCE}9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`,
+                sub: "AAAAAAAAAAAAAAAAAAAAAIkzqFVrSaSaFHy782bbtaQ",
+                exp: "1536361411",
+                name: "Abe Lincoln",
+                preferred_username: "AbeLi@microsoft.com",
+                oid: "00000000-0000-0000-66f3-3332eca7ea81",
+                tid: "3338040d-6c67-4c5b-b112-36a304b66dad",
+                nonce: "123523",
             };
             const testCodeResponse: AuthorizationCodePayload = {
                 code: "authcode",
                 nonce: idTokenClaims.nonce,
                 state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
-                cloud_instance_host_name: "contoso.com"
             };
             const testAccount: AccountInfo = {
                 homeAccountId: TEST_DATA_CLIENT_INFO.TEST_HOME_ACCOUNT_ID,
                 environment: "login.windows.net",
                 tenantId: idTokenClaims.tid,
                 username: idTokenClaims.preferred_username,
-                localAccountId: TEST_DATA_CLIENT_INFO.TEST_LOCAL_ACCOUNT_ID
+                localAccountId: TEST_DATA_CLIENT_INFO.TEST_LOCAL_ACCOUNT_ID,
             };
             const testCcsCred: CcsCredential = {
                 credential: idTokenClaims.preferred_username || "",
-                type: CcsCredentialType.UPN
+                type: CcsCredentialType.UPN,
             };
             const testTokenResponse: AuthenticationResult = {
                 authority: authorityInstance.canonicalAuthority,
@@ -211,76 +302,90 @@ describe("InteractionHandler.ts Unit Tests", () => {
                 scopes: ["scope1", "scope2"],
                 account: testAccount,
                 correlationId: RANDOM_TEST_GUID,
-                expiresOn: new Date(Date.now() + (TEST_TOKEN_LIFETIMES.DEFAULT_EXPIRES_IN * 1000)),
+                expiresOn: new Date(
+                    Date.now() + TEST_TOKEN_LIFETIMES.DEFAULT_EXPIRES_IN * 1000
+                ),
                 idTokenClaims: idTokenClaims,
                 tenantId: idTokenClaims.tid,
                 uniqueId: idTokenClaims.oid,
                 state: "testState",
-                tokenType: AuthenticationScheme.BEARER
+                tokenType: AuthenticationScheme.BEARER,
             };
             testAuthCodeRequest.ccsCredential = testCcsCred;
-            browserStorage.setTemporaryCache(browserStorage.generateStateKey(TEST_STATE_VALUES.TEST_STATE_REDIRECT), TEST_STATE_VALUES.TEST_STATE_REDIRECT);
-            browserStorage.setTemporaryCache(browserStorage.generateNonceKey(TEST_STATE_VALUES.TEST_STATE_REDIRECT), idTokenClaims.nonce);
-            browserStorage.setTemporaryCache(TemporaryCacheKeys.CCS_CREDENTIAL, JSON.stringify(CcsCredentialType));
-            
-            sinon.stub(Authority.prototype, "isAlias").returns(false);
-            const authorityOptions: AuthorityOptions = {
-                protocolMode: ProtocolMode.AAD,
-                knownAuthorities: ["www.contoso.com"],
-                cloudDiscoveryMetadata: "",
-                authorityMetadata: ""
-            }
-            const authority = new Authority("https://www.contoso.com/common/", networkInterface, browserStorage, authorityOptions);
-            sinon.stub(AuthorityFactory, "createDiscoveredInstance").resolves(authority);
-            sinon.stub(Authority.prototype, "discoveryComplete").returns(true);
-            const updateAuthoritySpy = sinon.spy(AuthorizationCodeClient.prototype, "updateAuthority");
-            const acquireTokenSpy = sinon.stub(AuthorizationCodeClient.prototype, "acquireToken").resolves(testTokenResponse);
-            const interactionHandler = new TestInteractionHandler(authCodeModule, browserStorage);
+            browserStorage.setTemporaryCache(
+                browserStorage.generateStateKey(
+                    TEST_STATE_VALUES.TEST_STATE_REDIRECT
+                ),
+                TEST_STATE_VALUES.TEST_STATE_REDIRECT
+            );
+            browserStorage.setTemporaryCache(
+                browserStorage.generateNonceKey(
+                    TEST_STATE_VALUES.TEST_STATE_REDIRECT
+                ),
+                idTokenClaims.nonce
+            );
+            browserStorage.setTemporaryCache(
+                TemporaryCacheKeys.CCS_CREDENTIAL,
+                CcsCredentialType.UPN
+            );
+            const acquireTokenSpy = jest
+                .spyOn(AuthorizationCodeClient.prototype, "acquireToken")
+                .mockResolvedValue(testTokenResponse);
+            const interactionHandler = new TestInteractionHandler(
+                authCodeModule,
+                browserStorage
+            );
             await interactionHandler.initiateAuthRequest("testNavUrl");
 
-            const tokenResponse = await interactionHandler.handleCodeResponseFromServer(testCodeResponse, TEST_STATE_VALUES.TEST_STATE_REDIRECT, authorityInstance, authConfig.networkInterface!);
+            const tokenResponse =
+                await interactionHandler.handleCodeResponseFromServer(
+                    testCodeResponse,
+                    {
+                        authority: TEST_CONFIG.validAuthority,
+                        scopes: ["User.Read"],
+                        correlationId: TEST_CONFIG.CORRELATION_ID,
+                        redirectUri: "/",
+                        responseMode: "fragment",
+                        nonce: TEST_CONFIG.CORRELATION_ID,
+                        state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
+                    }
+                );
 
-            expect(updateAuthoritySpy.calledWith(authority)).toBe(true);
             expect(tokenResponse).toEqual(testTokenResponse);
-            expect(acquireTokenSpy.calledWith(testAuthCodeRequest, testCodeResponse)).toBe(true);
-            expect(acquireTokenSpy.threw()).toBe(false);
+            expect(acquireTokenSpy).toHaveBeenCalledWith(
+                testAuthCodeRequest,
+                testCodeResponse
+            );
+            expect(acquireTokenSpy).not.toThrow();
         });
     });
 
-    describe("handleCodeResponseFromHash()", () => {
-
-        it("throws error if given location hash is empty", async () => {
-            const interactionHandler = new TestInteractionHandler(authCodeModule, browserStorage);
-            expect(interactionHandler.handleCodeResponseFromHash("", "", authorityInstance, authConfig.networkInterface!)).rejects.toMatchObject(BrowserAuthError.createEmptyHashError(""));
-            //@ts-ignore
-            expect(interactionHandler.handleCodeResponseFromHash(null, "", authorityInstance, authConfig.networkInterface)).rejects.toMatchObject(BrowserAuthError.createEmptyHashError(null));
-        });
-        
+    describe("handleCodeResponse()", () => {
         // TODO: Need to improve these tests
         it("successfully uses a new authority if cloud_instance_host_name is different", async () => {
             const idTokenClaims = {
-                "ver": "2.0",
-                "iss": `${TEST_URIS.DEFAULT_INSTANCE}9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`,
-                "sub": "AAAAAAAAAAAAAAAAAAAAAIkzqFVrSaSaFHy782bbtaQ",
-                "exp": "1536361411",
-                "name": "Abe Lincoln",
-                "preferred_username": "AbeLi@microsoft.com",
-                "oid": "00000000-0000-0000-66f3-3332eca7ea81",
-                "tid": "3338040d-6c67-4c5b-b112-36a304b66dad",
-                "nonce": "123523"
+                ver: "2.0",
+                iss: `${TEST_URIS.DEFAULT_INSTANCE}9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`,
+                sub: "AAAAAAAAAAAAAAAAAAAAAIkzqFVrSaSaFHy782bbtaQ",
+                exp: "1536361411",
+                name: "Abe Lincoln",
+                preferred_username: "AbeLi@microsoft.com",
+                oid: "00000000-0000-0000-66f3-3332eca7ea81",
+                tid: "3338040d-6c67-4c5b-b112-36a304b66dad",
+                nonce: "123523",
             };
             const testCodeResponse: AuthorizationCodePayload = {
                 code: "authcode",
                 nonce: idTokenClaims.nonce,
                 state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
-                cloud_instance_host_name: "contoso.com"
+                cloud_instance_host_name: "login.windows.net",
             };
             const testAccount: AccountInfo = {
                 homeAccountId: TEST_DATA_CLIENT_INFO.TEST_HOME_ACCOUNT_ID,
                 environment: "login.windows.net",
                 tenantId: idTokenClaims.tid,
                 username: idTokenClaims.preferred_username,
-                localAccountId: TEST_DATA_CLIENT_INFO.TEST_LOCAL_ACCOUNT_ID
+                localAccountId: TEST_DATA_CLIENT_INFO.TEST_LOCAL_ACCOUNT_ID,
             };
             const testTokenResponse: AuthenticationResult = {
                 authority: authorityInstance.canonicalAuthority,
@@ -290,65 +395,97 @@ describe("InteractionHandler.ts Unit Tests", () => {
                 scopes: ["scope1", "scope2"],
                 account: testAccount,
                 correlationId: RANDOM_TEST_GUID,
-                expiresOn: new Date(Date.now() + (TEST_TOKEN_LIFETIMES.DEFAULT_EXPIRES_IN * 1000)),
+                expiresOn: new Date(
+                    Date.now() + TEST_TOKEN_LIFETIMES.DEFAULT_EXPIRES_IN * 1000
+                ),
                 idTokenClaims: idTokenClaims,
                 tenantId: idTokenClaims.tid,
                 uniqueId: idTokenClaims.oid,
                 state: "testState",
-                tokenType: AuthenticationScheme.BEARER
+                tokenType: AuthenticationScheme.BEARER,
             };
-            browserStorage.setTemporaryCache(browserStorage.generateStateKey(TEST_STATE_VALUES.TEST_STATE_REDIRECT), TEST_STATE_VALUES.TEST_STATE_REDIRECT);
-            browserStorage.setTemporaryCache(browserStorage.generateNonceKey(TEST_STATE_VALUES.TEST_STATE_REDIRECT), idTokenClaims.nonce);
-            sinon.stub(AuthorizationCodeClient.prototype, "handleFragmentResponse").returns(testCodeResponse);
-            sinon.stub(Authority.prototype, "isAlias").returns(false);
-            const authorityOptions: AuthorityOptions = {
-                protocolMode: ProtocolMode.AAD,
-                knownAuthorities: ["www.contoso.com"],
-                cloudDiscoveryMetadata: "",
-                authorityMetadata: ""
-            }
-            const authority = new Authority("https://www.contoso.com/common/", networkInterface, browserStorage, authorityOptions);
-            sinon.stub(AuthorityFactory, "createDiscoveredInstance").resolves(authority);
-            sinon.stub(Authority.prototype, "discoveryComplete").returns(true);
-            const updateAuthoritySpy = sinon.spy(AuthorizationCodeClient.prototype, "updateAuthority");
-            const acquireTokenSpy = sinon.stub(AuthorizationCodeClient.prototype, "acquireToken").resolves(testTokenResponse);
-            const interactionHandler = new TestInteractionHandler(authCodeModule, browserStorage);
+            browserStorage.setTemporaryCache(
+                browserStorage.generateStateKey(
+                    TEST_STATE_VALUES.TEST_STATE_REDIRECT
+                ),
+                TEST_STATE_VALUES.TEST_STATE_REDIRECT
+            );
+            browserStorage.setTemporaryCache(
+                browserStorage.generateNonceKey(
+                    TEST_STATE_VALUES.TEST_STATE_REDIRECT
+                ),
+                idTokenClaims.nonce
+            );
+            jest.spyOn(
+                AuthorizationCodeClient.prototype,
+                "handleFragmentResponse"
+            ).mockReturnValue(testCodeResponse);
+            const updateAuthoritySpy = jest.spyOn(
+                AuthorizationCodeClient.prototype,
+                "updateAuthority"
+            );
+            const acquireTokenSpy = jest
+                .spyOn(AuthorizationCodeClient.prototype, "acquireToken")
+                .mockResolvedValue(testTokenResponse);
+            const interactionHandler = new TestInteractionHandler(
+                authCodeModule,
+                browserStorage
+            );
             await interactionHandler.initiateAuthRequest("testNavUrl");
-            const tokenResponse = await interactionHandler.handleCodeResponseFromHash(TEST_HASHES.TEST_SUCCESS_CODE_HASH_REDIRECT, TEST_STATE_VALUES.TEST_STATE_REDIRECT, authorityInstance, authConfig.networkInterface!);
-            expect(updateAuthoritySpy.calledWith(authority)).toBe(true);
+            const tokenResponse = await interactionHandler.handleCodeResponse(
+                {
+                    code: "authCode",
+                    state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
+                },
+                {
+                    authority: TEST_CONFIG.validAuthority,
+                    scopes: ["User.Read"],
+                    correlationId: TEST_CONFIG.CORRELATION_ID,
+                    redirectUri: "/",
+                    responseMode: "fragment",
+                    nonce: TEST_CONFIG.CORRELATION_ID,
+                    state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
+                }
+            );
+            expect(updateAuthoritySpy).toHaveBeenCalledWith(
+                testCodeResponse.cloud_instance_host_name,
+                TEST_CONFIG.CORRELATION_ID
+            );
             expect(tokenResponse).toEqual(testTokenResponse);
-            expect(acquireTokenSpy.calledWith(testAuthCodeRequest, testCodeResponse)).toBe(true);
-            expect(acquireTokenSpy.threw()).toBe(false);
+            expect(acquireTokenSpy).toHaveBeenCalledWith(
+                testAuthCodeRequest,
+                testCodeResponse
+            );
+            expect(acquireTokenSpy).not.toThrow();
         });
 
         it("successfully adds login_hint as CCS credential to auth code request", async () => {
             const idTokenClaims = {
-                "ver": "2.0",
-                "iss": `${TEST_URIS.DEFAULT_INSTANCE}9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`,
-                "sub": "AAAAAAAAAAAAAAAAAAAAAIkzqFVrSaSaFHy782bbtaQ",
-                "exp": "1536361411",
-                "name": "Abe Lincoln",
-                "preferred_username": "AbeLi@microsoft.com",
-                "oid": "00000000-0000-0000-66f3-3332eca7ea81",
-                "tid": "3338040d-6c67-4c5b-b112-36a304b66dad",
-                "nonce": "123523"
+                ver: "2.0",
+                iss: `${TEST_URIS.DEFAULT_INSTANCE}9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`,
+                sub: "AAAAAAAAAAAAAAAAAAAAAIkzqFVrSaSaFHy782bbtaQ",
+                exp: "1536361411",
+                name: "Abe Lincoln",
+                preferred_username: "AbeLi@microsoft.com",
+                oid: "00000000-0000-0000-66f3-3332eca7ea81",
+                tid: "3338040d-6c67-4c5b-b112-36a304b66dad",
+                nonce: "123523",
             };
             const testCodeResponse: AuthorizationCodePayload = {
                 code: "authcode",
                 nonce: idTokenClaims.nonce,
                 state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
-                cloud_instance_host_name: "contoso.com"
             };
             const testAccount: AccountInfo = {
                 homeAccountId: TEST_DATA_CLIENT_INFO.TEST_HOME_ACCOUNT_ID,
                 environment: "login.windows.net",
                 tenantId: idTokenClaims.tid,
                 username: idTokenClaims.preferred_username,
-                localAccountId: TEST_DATA_CLIENT_INFO.TEST_LOCAL_ACCOUNT_ID
+                localAccountId: TEST_DATA_CLIENT_INFO.TEST_LOCAL_ACCOUNT_ID,
             };
             const testCcsCred: CcsCredential = {
                 credential: idTokenClaims.preferred_username || "",
-                type: CcsCredentialType.UPN
+                type: CcsCredentialType.UPN,
             };
             const testTokenResponse: AuthenticationResult = {
                 authority: authorityInstance.canonicalAuthority,
@@ -358,37 +495,65 @@ describe("InteractionHandler.ts Unit Tests", () => {
                 scopes: ["scope1", "scope2"],
                 account: testAccount,
                 correlationId: RANDOM_TEST_GUID,
-                expiresOn: new Date(Date.now() + (TEST_TOKEN_LIFETIMES.DEFAULT_EXPIRES_IN * 1000)),
+                expiresOn: new Date(
+                    Date.now() + TEST_TOKEN_LIFETIMES.DEFAULT_EXPIRES_IN * 1000
+                ),
                 idTokenClaims: idTokenClaims,
                 tenantId: idTokenClaims.tid,
                 uniqueId: idTokenClaims.oid,
                 state: "testState",
-                tokenType: AuthenticationScheme.BEARER
+                tokenType: AuthenticationScheme.BEARER,
             };
             testAuthCodeRequest.ccsCredential = testCcsCred;
-            browserStorage.setTemporaryCache(browserStorage.generateStateKey(TEST_STATE_VALUES.TEST_STATE_REDIRECT), TEST_STATE_VALUES.TEST_STATE_REDIRECT);
-            browserStorage.setTemporaryCache(browserStorage.generateNonceKey(TEST_STATE_VALUES.TEST_STATE_REDIRECT), idTokenClaims.nonce);
-            browserStorage.setTemporaryCache(TemporaryCacheKeys.CCS_CREDENTIAL, JSON.stringify(CcsCredentialType));
-            sinon.stub(AuthorizationCodeClient.prototype, "handleFragmentResponse").returns(testCodeResponse);
-            sinon.stub(Authority.prototype, "isAlias").returns(false);
-            const authorityOptions: AuthorityOptions = {
-                protocolMode: ProtocolMode.AAD,
-                knownAuthorities: ["www.contoso.com"],
-                cloudDiscoveryMetadata: "",
-                authorityMetadata: ""
-            }
-            const authority = new Authority("https://www.contoso.com/common/", networkInterface, browserStorage, authorityOptions);
-            sinon.stub(AuthorityFactory, "createDiscoveredInstance").resolves(authority);
-            sinon.stub(Authority.prototype, "discoveryComplete").returns(true);
-            const updateAuthoritySpy = sinon.spy(AuthorizationCodeClient.prototype, "updateAuthority");
-            const acquireTokenSpy = sinon.stub(AuthorizationCodeClient.prototype, "acquireToken").resolves(testTokenResponse);
-            const interactionHandler = new TestInteractionHandler(authCodeModule, browserStorage);
+            browserStorage.setTemporaryCache(
+                browserStorage.generateStateKey(
+                    TEST_STATE_VALUES.TEST_STATE_REDIRECT
+                ),
+                TEST_STATE_VALUES.TEST_STATE_REDIRECT
+            );
+            browserStorage.setTemporaryCache(
+                browserStorage.generateNonceKey(
+                    TEST_STATE_VALUES.TEST_STATE_REDIRECT
+                ),
+                idTokenClaims.nonce
+            );
+            browserStorage.setTemporaryCache(
+                TemporaryCacheKeys.CCS_CREDENTIAL,
+                CcsCredentialType.UPN
+            );
+            jest.spyOn(
+                AuthorizationCodeClient.prototype,
+                "handleFragmentResponse"
+            ).mockReturnValue(testCodeResponse);
+            const acquireTokenSpy = jest
+                .spyOn(AuthorizationCodeClient.prototype, "acquireToken")
+                .mockResolvedValue(testTokenResponse);
+            const interactionHandler = new TestInteractionHandler(
+                authCodeModule,
+                browserStorage
+            );
             await interactionHandler.initiateAuthRequest("testNavUrl");
-            const tokenResponse = await interactionHandler.handleCodeResponseFromHash(TEST_HASHES.TEST_SUCCESS_CODE_HASH_REDIRECT, TEST_STATE_VALUES.TEST_STATE_REDIRECT, authorityInstance, authConfig.networkInterface!);
-            expect(updateAuthoritySpy.calledWith(authority)).toBe(true);
+            const tokenResponse = await interactionHandler.handleCodeResponse(
+                {
+                    code: "authCode",
+                    state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
+                },
+                {
+                    authority: TEST_CONFIG.validAuthority,
+                    scopes: ["User.Read"],
+                    correlationId: TEST_CONFIG.CORRELATION_ID,
+                    redirectUri: "/",
+                    responseMode: "fragment",
+                    nonce: TEST_CONFIG.CORRELATION_ID,
+                    state: TEST_STATE_VALUES.TEST_STATE_REDIRECT,
+                }
+            );
             expect(tokenResponse).toEqual(testTokenResponse);
-            expect(acquireTokenSpy.calledWith(testAuthCodeRequest, testCodeResponse)).toBe(true);
-            expect(acquireTokenSpy.threw()).toBe(false);
+            expect(acquireTokenSpy).toHaveBeenCalledWith(
+                testAuthCodeRequest,
+                testCodeResponse
+            );
+            expect(acquireTokenSpy).not.toThrow();
         });
     });
 });

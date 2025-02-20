@@ -3,10 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { Constants, PkceCodes } from "@azure/msal-common";
-import { CharSet, RANDOM_OCTET_SIZE } from "../utils/Constants";
-import { EncodingUtils } from "../utils/EncodingUtils";
-import { HashUtils } from "./HashUtils";
+import { Constants, PkceCodes } from "@azure/msal-common/node";
+import { CharSet, RANDOM_OCTET_SIZE } from "../utils/Constants.js";
+import { EncodingUtils } from "../utils/EncodingUtils.js";
+import { HashUtils } from "./HashUtils.js";
 import crypto from "crypto";
 
 /**
@@ -37,7 +37,7 @@ export class PkceGenerator {
         while (charArr.length <= RANDOM_OCTET_SIZE) {
             const byte = crypto.randomBytes(1)[0];
             if (byte >= maxNumber) {
-                /* 
+                /*
                  * Ignore this number to maintain randomness.
                  * Including it would result in an unequal distribution of characters after doing the modulo
                  */
@@ -56,9 +56,8 @@ export class PkceGenerator {
      */
     private generateCodeChallengeFromVerifier(codeVerifier: string): string {
         return EncodingUtils.base64EncodeUrl(
-            this.hashUtils.sha256(codeVerifier).toString("base64"), 
-            "base64" 
+            this.hashUtils.sha256(codeVerifier).toString("base64"),
+            "base64"
         );
     }
-
 }

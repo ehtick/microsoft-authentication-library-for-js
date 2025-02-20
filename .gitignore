@@ -179,8 +179,6 @@ _pkginfo.txt
 # Visual Studio cache files
 # files ending in .cache can be ignored
 *.[Cc]ache
-# but keep track of directories ending in .cache
-!*.[Cc]ache/
 
 # Others
 ClientBin/
@@ -265,8 +263,6 @@ coverage/
 typings/
 lib-commonjs/
 lib-es6/
-lib/msal-core/lib-commonjs
-lib/msal-core/lib-es6
 *.tgz
 *.zip
 samples/**/screenshots
@@ -279,3 +275,15 @@ lib/msal-node/temp
 ref/
 .server.pid
 *.pem
+
+# Typescript & Rollup
+tsconfig.build.tsbuildinfo
+
+# MSAL Node Cache Files
+temp-cache.json
+
+# Jest JUnit reporter
+junit.xml
+
+# ApiExtractor
+temp/

@@ -6,15 +6,15 @@ While using MSAL.js, you should understand the implications of retrieving tokens
 
 ## Token Lifetimes and Expiration
 
-A more detailed explanation of token lifetimes can be found [here](https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-configurable-token-lifetimes). Some of the information is summarized below.
+A more detailed explanation of token lifetimes can be found [here](https://docs.microsoft.com/azure/active-directory/develop/active-directory-configurable-token-lifetimes). Some of the information is summarized below.
 
 ### ID tokens
 
-ID tokens are bound to a specific combination of account and client, and usually contain profile information about the user. Typically, a web application's user session lifetime will match that of the ID token session lifetime, which is by default 24 hours. You can read more about configuring token lifetimes [here](https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-configurable-token-lifetimes).
+ID tokens are bound to a specific combination of account and client, and usually contain profile information about the user. Typically, a web application's user session lifetime will match that of the ID token session lifetime, which is by default 24 hours. You can read more about configuring token lifetimes [here](https://docs.microsoft.com/azure/active-directory/develop/active-directory-configurable-token-lifetimes).
 
 ### Access tokens
 
-Access tokens in the browser have a default recommended expiration of 1 hour. After this 1 hour, any bearer calls with the expired token will be rejected. This token can be refreshed silently using the refresh token retrieved with this token. You can read more about configuring token lifetimes [here](https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-configurable-token-lifetimes).
+Access tokens in the browser have a default recommended expiration of 1 hour. After this 1 hour, any bearer calls with the expired token will be rejected. This token can be refreshed silently using the refresh token retrieved with this token. You can read more about configuring token lifetimes [here](https://docs.microsoft.com/azure/active-directory/develop/active-directory-configurable-token-lifetimes).
 
 ### Refresh tokens
 
@@ -34,16 +34,63 @@ The `PublicClientApplication` object exposes an API called `acquireTokenSilent` 
 
 See [here](./request-response-object.md#silentflowrequest) for more information on what configuration parameters you can set for the `acquireTokenSilent` method.
 
+### Avoiding interactive interruptions in the middle of a user's session
+
+In some cases you may want to pre-emptively invoke interaction, if needed, at the beginning of a user's session to ensure they can continue to acquire tokens silently and use your application without further interruptions. You can of course achieve this by invoking interaction each time your application is loaded for the first time, this is, however, a poor user experience and less performant when a user already has tokens from a previous session or another window/tab. Instead, with a few request parameters you can use `acquireTokenSilent` to ensure the cache has the necessary tokens available to return silently for some arbitrary length of time.
+
+To ensure `acquireTokenSilent` can return valid tokens for a minimum of up to 1 hour:
+
+-   Call `acquireTokenSilent` on page load with the `forceRefresh` request parameter set to `true`. This will skip the cache and acquire a fresh token which can then be served from the cache on subsequent calls.
+-   On subsequent calls leave `forceRefresh` unset or explicitly `false` to ensure tokens can be served from the cache
+
+To ensure `acquireTokenSilent` can return valid tokens for a minimum of any length of time up to 24 hours:
+
+-   Call `acquireTokenSilent` on page load with the `forceRefresh` request paramter set to `true` & the `refreshTokenExpirationOffsetSeconds` parameter set to the desired length of time (in seconds) to be interaction-free
+-   On subsequent calls leave `forceRefresh` and `refreshTokenExpirationOffsetSeconds` unset to ensure tokens can be served from the cache
+
+For example if you'd like to ensure the user can acquire tokens silently for the next 2 hours:
+
+```javascript
+var request = {
+    scopes: ["Mail.Read"],
+    account: currentAccount,
+    forceRefresh: true,
+    refreshTokenExpirationOffsetSeconds: 7200 // 2 hours * 60 minutes * 60 seconds = 7200 seconds
+};
+
+const tokenResponse = await msalInstance.acquireTokenSilent(request).catch(async (error) => {
+    if (error instanceof InteractionRequiredAuthError) {
+        // fallback to interaction when silent call fails
+        await msalInstance.acquireTokenRedirect(request);
+    }
+});
+```
+
+Note: There is never a guarantee that a token can be acquired silently even if the refresh token has not expired yet. The patterns described above are best effort attempts to minimize interaction at inconvenient times but will not eliminate the possibility of required interactions within the desired timeframes. Additionally, not all identity providers return the refresh token expiration - in those cases the `refreshTokenExpirationOffsetSeconds` request parameter will not be evaluated.
+
+### Cache Lookup Policy
+
+A Cache Lookup Policy can be optionally provided to the request. The Cache Lookup Policies are:
+
+-   `CacheLookupPolicy.Default` - `acquireTokenSilent` will attempt to retrieve an access token from the cache. If the access token is expired or cannot be found the refresh token will be used to acquire a new one. Finally, if the refresh token is expired, `acquireTokenSilent` will attempt to silently acquire a new access token, id token, and refresh token.
+-   `CacheLookupPolicy.AccessToken` - `acquireTokenSilent` will only look for access tokens in the cache. It will not attempt to renew access or refresh tokens.
+-   `CacheLookupPolicy.AccessTokenAndRefreshToken` - `acquireTokenSilent` will attempt to retrieve an access token from the cache. If the access token is expired or cannot be found, the refresh token will be used to acquire a new one. If the refresh token is expired, it will not be renewed and `acquireTokenSilent` will fail.
+-   `CacheLookupPolicy.RefreshToken` - `acquireTokenSilent` will not attempt to retrieve access tokens from the cache and will instead attempt to exchange the cached refresh token for a new access token. If the refresh token is expired, it will not be renewed and `acquireTokenSilent` will fail.
+-   `CacheLookupPolicy.RefreshTokenAndNetwork` - `acquireTokenSilent` will not look in the cache for the access token. It will go directly to network with the cached refresh token. If the refresh token is expired an attempt will be made to renew it. This is equivalent to setting `forceRefresh: true`.
+-   `CacheLookupPolicy.Skip` - `acquireTokenSilent` will attempt to renew both access and refresh tokens. It will not look in the cache. This will always fail if 3rd party cookies are blocked by the browser.
+
 ### Code Snippets
 
-- Popup
+#### Popup
+
 ```javascript
 var username = "test@contoso.com";
 var currentAccount = msalInstance.getAccountByUsername(username);
 var silentRequest = {
     scopes: ["Mail.Read"],
     account: currentAccount,
-    forceRefresh: false
+    forceRefresh: false,
+    cacheLookupPolicy: CacheLookupPolicy.Default // will default to CacheLookupPolicy.Default if omitted
 };
 
 var request = {
@@ -55,20 +102,25 @@ const tokenResponse = await msalInstance.acquireTokenSilent(silentRequest).catch
     if (error instanceof InteractionRequiredAuthError) {
         // fallback to interaction when silent call fails
         return await msalInstance.acquireTokenPopup(request).catch(error => {
-            handleError(error);
+            if (error instanceof InteractionRequiredAuthError) {
+                // fallback to interaction when silent call fails
+                return msalInstance.acquireTokenRedirect(request)
+            }
         });
     }
 });
 ```
 
-- Redirect
+#### Redirect
+
 ```javascript
 var username = "test@contoso.com";
 var currentAccount = msalInstance.getAccountByUsername(username);
 var silentRequest = {
     scopes: ["Mail.Read"],
     account: currentAccount,
-    forceRefresh: false
+    forceRefresh: false,
+    cacheLookupPolicy: CacheLookupPolicy.Default // will default to CacheLookupPolicy.Default if omitted
 };
 
 var request = {
@@ -84,6 +136,6 @@ const tokenResponse = await msalInstance.acquireTokenSilent(silentRequest).catch
 });
 ```
 
-# Next Steps
+## Next Steps
 
 Learn how to perform [log out](./logout.md).

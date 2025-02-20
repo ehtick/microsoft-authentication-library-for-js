@@ -1,14 +1,32 @@
+/*
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
+
 import {
     buildAppConfiguration,
     Configuration,
-} from '../../src/config/Configuration';
-import { HttpClient } from '../../src/network/HttpClient';
-import { TEST_CONSTANTS, AUTHENTICATION_RESULT } from '../utils/TestConstants';
-import { Authority, AuthorityFactory, LogLevel, NetworkRequestOptions, AuthToken, AzureCloudInstance } from '@azure/msal-common';
-import { ClientCredentialRequest, ConfidentialClientApplication } from '../../src';
+} from "../../src/config/Configuration.js";
+import { HttpClient } from "../../src/network/HttpClient.js";
+import {
+    TEST_CONSTANTS,
+    AUTHENTICATION_RESULT,
+    DEFAULT_OPENID_CONFIG_RESPONSE,
+} from "../utils/TestConstants.js";
+import {
+    LogLevel,
+    NetworkRequestOptions,
+    AzureCloudInstance,
+} from "@azure/msal-common";
+import {
+    ClientCredentialRequest,
+    ConfidentialClientApplication,
+} from "../../src/index.js";
+import { OnBehalfOfRequest } from "../../src/request/OnBehalfOfRequest.js";
+import { RANDOM_TEST_GUID } from "../test_kit/StringConstants.js";
 
-describe('ClientConfiguration tests', () => {
-    test('builds configuration and assigns default functions', () => {
+describe("ClientConfiguration tests", () => {
+    test("builds configuration and assigns default functions", () => {
         const config: Configuration = buildAppConfiguration({
             auth: {
                 clientId: TEST_CONSTANTS.CLIENT_ID,
@@ -34,27 +52,27 @@ describe('ClientConfiguration tests', () => {
 
         config.system!.loggerOptions!.loggerCallback!(
             LogLevel.Error,
-            'error',
+            "error",
             false
         );
         config.system!.loggerOptions!.loggerCallback!(
             LogLevel.Info,
-            'info',
+            "info",
             false
         );
         config.system!.loggerOptions!.loggerCallback!(
             LogLevel.Verbose,
-            'verbose',
+            "verbose",
             false
         );
         config.system!.loggerOptions!.loggerCallback!(
             LogLevel.Warning,
-            'warning',
+            "warning",
             false
         );
         config.system!.loggerOptions!.loggerCallback!(
             LogLevel.Warning,
-            'warning',
+            "warning",
             true
         );
 
@@ -65,8 +83,12 @@ describe('ClientConfiguration tests', () => {
         // expect(console.warn).toHaveBeenCalledTimes(1);
 
         // auth options
-        expect(config.auth!.authority).toEqual(TEST_CONSTANTS.DEFAULT_AUTHORITY);
-        expect(config.auth!.azureCloudOptions?.azureCloudInstance).toEqual(AzureCloudInstance.None);
+        expect(config.auth!.authority).toEqual(
+            TEST_CONSTANTS.DEFAULT_AUTHORITY
+        );
+        expect(config.auth!.azureCloudOptions?.azureCloudInstance).toEqual(
+            AzureCloudInstance.None
+        );
         expect(config.auth!.azureCloudOptions?.tenant).toEqual("");
         expect(config.auth!.clientId).toEqual(TEST_CONSTANTS.CLIENT_ID);
 
@@ -75,9 +97,9 @@ describe('ClientConfiguration tests', () => {
         expect(config.telemetry!.application!.appVersion).toEqual("");
     });
 
-    test('builds configuration and assigns default functions', () => {
+    test("builds configuration and assigns default functions", () => {
         const testNetworkResult = {
-            testParam: 'testValue',
+            testParam: "testValue",
         };
 
         const config: Configuration = {
@@ -123,14 +145,14 @@ describe('ClientConfiguration tests', () => {
             telemetry: {
                 application: {
                     appName: TEST_CONSTANTS.APP_NAME,
-                    appVersion: TEST_CONSTANTS.APP_VERSION
-                }
-            }
+                    appVersion: TEST_CONSTANTS.APP_VERSION,
+                },
+            },
         };
 
         const testNetworkOptions: NetworkRequestOptions = {
             headers: {},
-            body: '',
+            body: "",
         };
 
         // network options
@@ -156,58 +178,98 @@ describe('ClientConfiguration tests', () => {
         expect(config.auth!.clientId).toEqual(TEST_CONSTANTS.CLIENT_ID);
 
         // Application telemetry
-        expect(config.telemetry!.application!.appName).toEqual(TEST_CONSTANTS.APP_NAME);
-        expect(config.telemetry!.application!.appVersion).toEqual(TEST_CONSTANTS.APP_VERSION);
+        expect(config.telemetry!.application!.appName).toEqual(
+            TEST_CONSTANTS.APP_NAME
+        );
+        expect(config.telemetry!.application!.appVersion).toEqual(
+            TEST_CONSTANTS.APP_VERSION
+        );
     });
 
-    test('client capabilities are handled as expected', async () => {
-        const authority: Authority = {
-            regionDiscoveryMetadata: { region_used: undefined, region_source: undefined, region_outcome: undefined },
-            resolveEndpointsAsync: () => {
-                return new Promise<void>(resolve => {
-                    resolve();
-                });
+    test("client capabilities are handled as expected", async () => {
+        const appConfig: Configuration = {
+            auth: {
+                clientId: TEST_CONSTANTS.CLIENT_ID,
+                authority: TEST_CONSTANTS.AUTHORITY,
+                clientSecret: TEST_CONSTANTS.CLIENT_SECRET,
+                clientCapabilities: ["TEST-CAPABILITY"],
             },
-            discoveryComplete: () => {
-                return true;
+            system: {
+                networkClient: {
+                    sendGetRequestAsync: jest.fn(
+                        async (): Promise<any> => AUTHENTICATION_RESULT
+                    ),
+                    sendPostRequestAsync: jest.fn(
+                        async (): Promise<any> => AUTHENTICATION_RESULT
+                    ),
+                },
             },
-            getPreferredCache: () => {
-                return TEST_CONSTANTS.PREFERRED_CACHE;
-            }
-        } as Authority;
+        };
+
+        const request: ClientCredentialRequest = {
+            scopes: TEST_CONSTANTS.DEFAULT_GRAPH_SCOPE,
+            skipCache: true,
+            correlationId: RANDOM_TEST_GUID,
+        };
+
+        await new ConfidentialClientApplication(
+            appConfig
+        ).acquireTokenByClientCredential(request);
+
+        expect(
+            appConfig.system?.networkClient?.sendPostRequestAsync
+        ).toHaveBeenCalledWith(
+            DEFAULT_OPENID_CONFIG_RESPONSE.body.token_endpoint.replace(
+                "{tenant}",
+                "tenantid"
+            ) + `?client-request-id=${RANDOM_TEST_GUID}`,
+            expect.objectContaining({
+                body: expect.stringContaining("TEST-CAPABILITY"),
+            })
+        );
+    });
+
+    test("client capabilities are handled as expected for OBO flow", async () => {
+        const oboRequest: OnBehalfOfRequest = {
+            scopes: TEST_CONSTANTS.DEFAULT_GRAPH_SCOPE,
+            oboAssertion: "user_assertion_hash",
+            skipCache: true,
+            correlationId: RANDOM_TEST_GUID,
+        };
 
         const appConfig: Configuration = {
             auth: {
                 clientId: TEST_CONSTANTS.CLIENT_ID,
                 authority: TEST_CONSTANTS.AUTHORITY,
                 clientSecret: TEST_CONSTANTS.CLIENT_SECRET,
-                clientCapabilities: ["TEST-CAPABILITY"]
+                clientCapabilities: ["TEST-CAPABILITY"],
             },
             system: {
                 networkClient: {
-                    sendGetRequestAsync: jest.fn(async (): Promise<any> => AUTHENTICATION_RESULT),
-                    sendPostRequestAsync: jest.fn(async (): Promise<any> => AUTHENTICATION_RESULT)
-                }
-            }
+                    sendGetRequestAsync: jest.fn(
+                        async (): Promise<any> => AUTHENTICATION_RESULT
+                    ),
+                    sendPostRequestAsync: jest.fn(
+                        async (): Promise<any> => AUTHENTICATION_RESULT
+                    ),
+                },
+            },
         };
 
-        const request: ClientCredentialRequest = {
-            scopes: TEST_CONSTANTS.DEFAULT_GRAPH_SCOPE,
-            skipCache: true
-        };
+        await new ConfidentialClientApplication(
+            appConfig
+        ).acquireTokenOnBehalfOf(oboRequest);
 
-        jest.spyOn(AuthorityFactory, 'createDiscoveredInstance').mockReturnValue(Promise.resolve(authority));
-        jest.spyOn(AuthToken, 'extractTokenClaims').mockReturnValue({});
-
-        await (new ConfidentialClientApplication(appConfig)).acquireTokenByClientCredential(request);
-
-        expect(appConfig.system?.networkClient?.sendPostRequestAsync).toHaveBeenCalledWith(
-            undefined,
-            expect.objectContaining(
-                {
-                    "body": expect.stringContaining('TEST-CAPABILITY')
-                }
-            )
+        expect(
+            appConfig.system?.networkClient?.sendPostRequestAsync
+        ).toHaveBeenCalledWith(
+            DEFAULT_OPENID_CONFIG_RESPONSE.body.token_endpoint.replace(
+                "{tenant}",
+                "tenantid"
+            ) + `?client-request-id=${RANDOM_TEST_GUID}`,
+            expect.objectContaining({
+                body: expect.stringContaining("TEST-CAPABILITY"),
+            })
         );
     });
 });

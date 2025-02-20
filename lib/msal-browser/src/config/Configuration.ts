@@ -3,15 +3,38 @@
  * Licensed under the MIT License.
  */
 
-import { SystemOptions, LoggerOptions, INetworkModule, DEFAULT_SYSTEM_OPTIONS, Constants, ProtocolMode, LogLevel, StubbedNetworkModule, AzureCloudInstance, AzureCloudOptions, ApplicationTelemetry } from "@azure/msal-common";
-import { BrowserUtils } from "../utils/BrowserUtils";
-import { BrowserCacheLocation } from "../utils/BrowserConstants";
-import { INavigationClient } from "../navigation/INavigationClient";
-import { NavigationClient } from "../navigation/NavigationClient";
+import {
+    SystemOptions,
+    LoggerOptions,
+    INetworkModule,
+    DEFAULT_SYSTEM_OPTIONS,
+    Constants,
+    ProtocolMode,
+    OIDCOptions,
+    ServerResponseType,
+    LogLevel,
+    StubbedNetworkModule,
+    AzureCloudInstance,
+    AzureCloudOptions,
+    ApplicationTelemetry,
+    createClientConfigurationError,
+    ClientConfigurationErrorCodes,
+    IPerformanceClient,
+    StubPerformanceClient,
+    Logger,
+} from "@azure/msal-common/browser";
+import {
+    BrowserCacheLocation,
+    BrowserConstants,
+} from "../utils/BrowserConstants.js";
+import { INavigationClient } from "../navigation/INavigationClient.js";
+import { NavigationClient } from "../navigation/NavigationClient.js";
+import { FetchClient } from "../network/FetchClient.js";
+import * as BrowserUtils from "../utils/BrowserUtils.js";
 
 // Default timeout for popup windows and iframes in milliseconds
 export const DEFAULT_POPUP_TIMEOUT_MS = 60000;
-export const DEFAULT_IFRAME_TIMEOUT_MS = 6000;
+export const DEFAULT_IFRAME_TIMEOUT_MS = 10000;
 export const DEFAULT_REDIRECT_TIMEOUT_MS = 30000;
 export const DEFAULT_NATIVE_BROKER_HANDSHAKE_TIMEOUT_MS = 2000;
 
@@ -60,6 +83,10 @@ export type BrowserAuthOptions = {
      */
     protocolMode?: ProtocolMode;
     /**
+     * Enum that configures options for the OIDC protocol mode.
+     */
+    OIDCOptions?: OIDCOptions;
+    /**
      * Enum that represents the Azure Cloud to use.
      */
     azureCloudOptions?: AzureCloudOptions;
@@ -67,6 +94,29 @@ export type BrowserAuthOptions = {
      * Flag of whether to use the local metadata cache
      */
     skipAuthorityMetadataCache?: boolean;
+    /**
+     * App supports nested app auth or not; defaults to
+     *
+     * @deprecated This flag is deprecated and will be removed in the next major version. createNestablePublicClientApplication should be used instead.
+     */
+    supportsNestedAppAuth?: boolean;
+    /**
+     * Callback that will be passed the url that MSAL will navigate to in redirect flows. Returning false in the callback will stop navigation.
+     */
+    onRedirectNavigate?: (url: string) => boolean | void;
+    /**
+     * Flag of whether the STS will send back additional parameters to specify where the tokens should be retrieved from.
+     */
+    instanceAware?: boolean;
+};
+
+/** @internal */
+export type InternalAuthOptions = Omit<
+    Required<BrowserAuthOptions>,
+    "onRedirectNavigate"
+> & {
+    OIDCOptions: Required<OIDCOptions>;
+    onRedirectNavigate?: (url: string) => boolean | void;
 };
 
 /**
@@ -74,17 +124,30 @@ export type BrowserAuthOptions = {
  */
 export type CacheOptions = {
     /**
-     * Used to specify the cacheLocation user wants to set. Valid values are "localStorage" and "sessionStorage"
+     * Used to specify the cacheLocation user wants to set. Valid values are "localStorage", "sessionStorage" and "memoryStorage".
      */
     cacheLocation?: BrowserCacheLocation | string;
+    /**
+     * Used to specify the temporaryCacheLocation user wants to set. Valid values are "localStorage", "sessionStorage" and "memoryStorage".
+     */
+    temporaryCacheLocation?: BrowserCacheLocation | string;
     /**
      * If set, MSAL stores the auth request state required for validation of the auth flows in the browser cookies. By default this flag is set to false.
      */
     storeAuthStateInCookie?: boolean;
     /**
-     * If set, MSAL sets the "Secure" flag on cookies so they can only be sent over HTTPS. By default this flag is set to false.
+     * If set, MSAL sets the "Secure" flag on cookies so they can only be sent over HTTPS. By default this flag is set to true.
+     * @deprecated This option will be removed in a future major version and all cookies set will include the Secure attribute.
      */
     secureCookies?: boolean;
+    /**
+     * If set, MSAL will attempt to migrate cache entries from older versions on initialization. By default this flag is set to true if cacheLocation is localStorage, otherwise false.
+     */
+    cacheMigrationEnabled?: boolean;
+    /**
+     * Flag that determines whether access tokens are stored based on requested claims
+     */
+    claimsBasedCachingEnabled?: boolean;
 };
 
 export type BrowserSystemOptions = SystemOptions & {
@@ -114,6 +177,7 @@ export type BrowserSystemOptions = SystemOptions & {
     loadFrameTimeout?: number;
     /**
      * Maximum time the library should wait for a frame to load
+     * @deprecated This was previously needed for older browsers which are no longer supported by MSAL.js. This option will be removed in the next major version
      */
     navigateFrameWait?: number;
     /**
@@ -129,32 +193,17 @@ export type BrowserSystemOptions = SystemOptions & {
      */
     allowRedirectInIframe?: boolean;
     /**
-     * Flag to enable native broker support (e.g. acquiring tokens from WAM on Windows)
+     * Flag to enable native broker support (e.g. acquiring tokens from WAM on Windows, MacBroker on Mac)
      */
-    allowNativeBroker?: boolean;
+    allowPlatformBroker?: boolean;
     /**
      * Sets the timeout for waiting for the native broker handshake to resolve
      */
     nativeBrokerHandshakeTimeout?: number;
     /**
-     * Options related to browser crypto APIs
+     * Sets the interval length in milliseconds for polling the location attribute in popup windows (default is 30ms)
      */
-    cryptoOptions?: CryptoOptions;
-};
-
-export type CryptoOptions = {
-    
-    /**
-     * Enables the application to use the MSR Crypto interface, if available (and other interfaces are not)
-     * @type {?boolean}
-     */
-    useMsrCrypto?: boolean;
-     
-    /**
-     * Entropy to seed browser crypto API (needed for MSR Crypto). Must be cryptographically strong random numbers (e.g. crypto.randomBytes(48) from Node)
-     * @type {?Uint8Array}
-     */
-    entropy?: Uint8Array;
+    pollIntervalMilliseconds?: number;
 };
 
 /**
@@ -167,6 +216,8 @@ export type BrowserTelemetryOptions = {
      * - appVersion: Version of the application using MSAL
      */
     application?: ApplicationTelemetry;
+
+    client?: IPerformanceClient;
 };
 
 /**
@@ -176,26 +227,27 @@ export type Configuration = {
     /**
      * This is where you configure auth elements like clientID, authority used for authenticating against the Microsoft Identity Platform
      */
-    auth: BrowserAuthOptions,
+    auth: BrowserAuthOptions;
     /**
      * This is where you configure cache location and whether to store cache in cookies
      */
-    cache?: CacheOptions,
+    cache?: CacheOptions;
     /**
      * This is where you can configure the network client, logger, token renewal offset
      */
-    system?: BrowserSystemOptions,
+    system?: BrowserSystemOptions;
     /**
      * This is where you can configure telemetry data and options
      */
-    telemetry?: BrowserTelemetryOptions
+    telemetry?: BrowserTelemetryOptions;
 };
 
+/** @internal */
 export type BrowserConfiguration = {
-    auth: Required<BrowserAuthOptions>,
-    cache: Required<CacheOptions>,
-    system: Required<BrowserSystemOptions>,
-    telemetry: Required<BrowserTelemetryOptions>
+    auth: InternalAuthOptions;
+    cache: Required<CacheOptions>;
+    system: Required<BrowserSystemOptions>;
+    telemetry: Required<BrowserTelemetryOptions>;
 };
 
 /**
@@ -207,77 +259,148 @@ export type BrowserConfiguration = {
  *
  * @returns Configuration object
  */
-export function buildConfiguration({ auth: userInputAuth, cache: userInputCache, system: userInputSystem, telemetry: userInputTelemetry }: Configuration, isBrowserEnvironment: boolean): BrowserConfiguration {
-
+export function buildConfiguration(
+    {
+        auth: userInputAuth,
+        cache: userInputCache,
+        system: userInputSystem,
+        telemetry: userInputTelemetry,
+    }: Configuration,
+    isBrowserEnvironment: boolean
+): BrowserConfiguration {
     // Default auth options for browser
-    const DEFAULT_AUTH_OPTIONS: Required<BrowserAuthOptions> = {
+    const DEFAULT_AUTH_OPTIONS: InternalAuthOptions = {
         clientId: Constants.EMPTY_STRING,
         authority: `${Constants.DEFAULT_AUTHORITY}`,
         knownAuthorities: [],
         cloudDiscoveryMetadata: Constants.EMPTY_STRING,
         authorityMetadata: Constants.EMPTY_STRING,
-        redirectUri: Constants.EMPTY_STRING,
+        redirectUri:
+            typeof window !== "undefined" ? BrowserUtils.getCurrentUri() : "",
         postLogoutRedirectUri: Constants.EMPTY_STRING,
         navigateToLoginRequestUrl: true,
         clientCapabilities: [],
         protocolMode: ProtocolMode.AAD,
+        OIDCOptions: {
+            serverResponseType: ServerResponseType.FRAGMENT,
+            defaultScopes: [
+                Constants.OPENID_SCOPE,
+                Constants.PROFILE_SCOPE,
+                Constants.OFFLINE_ACCESS_SCOPE,
+            ],
+        },
         azureCloudOptions: {
             azureCloudInstance: AzureCloudInstance.None,
-            tenant: Constants.EMPTY_STRING
+            tenant: Constants.EMPTY_STRING,
         },
         skipAuthorityMetadataCache: false,
+        supportsNestedAppAuth: false,
+        instanceAware: false,
     };
 
     // Default cache options for browser
     const DEFAULT_CACHE_OPTIONS: Required<CacheOptions> = {
         cacheLocation: BrowserCacheLocation.SessionStorage,
+        temporaryCacheLocation: BrowserCacheLocation.SessionStorage,
         storeAuthStateInCookie: false,
-        secureCookies: false
+        secureCookies: false,
+        // Default cache migration to true if cache location is localStorage since entries are preserved across tabs/windows. Migration has little to no benefit in sessionStorage and memoryStorage
+        cacheMigrationEnabled:
+            userInputCache &&
+            userInputCache.cacheLocation === BrowserCacheLocation.LocalStorage
+                ? true
+                : false,
+        claimsBasedCachingEnabled: false,
     };
 
     // Default logger options for browser
     const DEFAULT_LOGGER_OPTIONS: LoggerOptions = {
         // eslint-disable-next-line @typescript-eslint/no-empty-function
-        loggerCallback: (): void => {},
+        loggerCallback: (): void => {
+            // allow users to not set logger call back
+        },
         logLevel: LogLevel.Info,
-        piiLoggingEnabled: false
+        piiLoggingEnabled: false,
     };
 
     // Default system options for browser
     const DEFAULT_BROWSER_SYSTEM_OPTIONS: Required<BrowserSystemOptions> = {
         ...DEFAULT_SYSTEM_OPTIONS,
         loggerOptions: DEFAULT_LOGGER_OPTIONS,
-        networkClient: isBrowserEnvironment ? BrowserUtils.getBrowserNetworkClient() : StubbedNetworkModule,
+        networkClient: isBrowserEnvironment
+            ? new FetchClient()
+            : StubbedNetworkModule,
         navigationClient: new NavigationClient(),
         loadFrameTimeout: 0,
         // If loadFrameTimeout is provided, use that as default.
-        windowHashTimeout: userInputSystem?.loadFrameTimeout || DEFAULT_POPUP_TIMEOUT_MS,
-        iframeHashTimeout: userInputSystem?.loadFrameTimeout || DEFAULT_IFRAME_TIMEOUT_MS,
-        navigateFrameWait: isBrowserEnvironment && BrowserUtils.detectIEOrEdge() ? 500 : 0,
+        windowHashTimeout:
+            userInputSystem?.loadFrameTimeout || DEFAULT_POPUP_TIMEOUT_MS,
+        iframeHashTimeout:
+            userInputSystem?.loadFrameTimeout || DEFAULT_IFRAME_TIMEOUT_MS,
+        navigateFrameWait: 0,
         redirectNavigationTimeout: DEFAULT_REDIRECT_TIMEOUT_MS,
         asyncPopups: false,
         allowRedirectInIframe: false,
-        allowNativeBroker: false,
-        nativeBrokerHandshakeTimeout: userInputSystem?.nativeBrokerHandshakeTimeout || DEFAULT_NATIVE_BROKER_HANDSHAKE_TIMEOUT_MS,
-        cryptoOptions: {
-            useMsrCrypto: false,
-            entropy: undefined
-        }
+        allowPlatformBroker: false,
+        nativeBrokerHandshakeTimeout:
+            userInputSystem?.nativeBrokerHandshakeTimeout ||
+            DEFAULT_NATIVE_BROKER_HANDSHAKE_TIMEOUT_MS,
+        pollIntervalMilliseconds: BrowserConstants.DEFAULT_POLL_INTERVAL_MS,
+    };
+
+    const providedSystemOptions: Required<BrowserSystemOptions> = {
+        ...DEFAULT_BROWSER_SYSTEM_OPTIONS,
+        ...userInputSystem,
+        loggerOptions: userInputSystem?.loggerOptions || DEFAULT_LOGGER_OPTIONS,
     };
 
     const DEFAULT_TELEMETRY_OPTIONS: Required<BrowserTelemetryOptions> = {
         application: {
             appName: Constants.EMPTY_STRING,
-            appVersion: Constants.EMPTY_STRING
-        }
+            appVersion: Constants.EMPTY_STRING,
+        },
+        client: new StubPerformanceClient(),
     };
+
+    // Throw an error if user has set OIDCOptions without being in OIDC protocol mode
+    if (
+        userInputAuth?.protocolMode !== ProtocolMode.OIDC &&
+        userInputAuth?.OIDCOptions
+    ) {
+        const logger = new Logger(providedSystemOptions.loggerOptions);
+        logger.warning(
+            JSON.stringify(
+                createClientConfigurationError(
+                    ClientConfigurationErrorCodes.cannotSetOIDCOptions
+                )
+            )
+        );
+    }
+
+    // Throw an error if user has set allowPlatformBroker to true without being in AAD protocol mode
+    if (
+        userInputAuth?.protocolMode &&
+        userInputAuth.protocolMode !== ProtocolMode.AAD &&
+        providedSystemOptions?.allowPlatformBroker
+    ) {
+        throw createClientConfigurationError(
+            ClientConfigurationErrorCodes.cannotAllowPlatformBroker
+        );
+    }
 
     const overlayedConfig: BrowserConfiguration = {
-        auth: { ...DEFAULT_AUTH_OPTIONS, ...userInputAuth },
+        auth: {
+            ...DEFAULT_AUTH_OPTIONS,
+            ...userInputAuth,
+            OIDCOptions: {
+                ...DEFAULT_AUTH_OPTIONS.OIDCOptions,
+                ...userInputAuth?.OIDCOptions,
+            },
+        },
         cache: { ...DEFAULT_CACHE_OPTIONS, ...userInputCache },
-        system: { ...DEFAULT_BROWSER_SYSTEM_OPTIONS, ...userInputSystem },
-        telemetry: { ...DEFAULT_TELEMETRY_OPTIONS, ...userInputTelemetry }
+        system: providedSystemOptions,
+        telemetry: { ...DEFAULT_TELEMETRY_OPTIONS, ...userInputTelemetry },
     };
+
     return overlayedConfig;
 }
-

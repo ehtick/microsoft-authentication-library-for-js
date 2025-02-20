@@ -2,12 +2,15 @@
 const msalConfig = {
     auth: {
         clientId: "4c837770-7a2b-471e-aafa-3328d04a23b1",
-        authority: "https://login.microsoftonline.com/tfp/msidlabb2c.onmicrosoft.com/B2C_1_SISOPolicy/",
-        knownAuthorities: ["login.microsoftonline.com"]
+        authority: "https://msidlabb2c.b2clogin.com/msidlabb2c.onmicrosoft.com/B2C_1_SISOPolicy/",
+        knownAuthorities: ["msidlabb2c.b2clogin.com"]
     },
     cache: {
         cacheLocation: "sessionStorage", // This configures where your cache will be stored
         storeAuthStateInCookie: false, // Set this to "true" if you are having issues on IE11 or Edge
+    },
+    system: {
+        allowPlatformBroker: false // Disables WAM Broker
     }
 };
 

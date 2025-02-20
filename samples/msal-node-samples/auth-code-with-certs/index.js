@@ -13,7 +13,17 @@ const msal = require('@azure/msal-node');
  * If you have encrypted your private key with a *pass phrase* as recommended,
  * you'll need to decrypt it before passing it to msal-node for initialization.
  */
-const privateKeySource = fs.readFileSync('./certs/example.key');
+// Secrets should never be hardcoded. The dotenv npm package can be used to store secrets or certificates
+// in a .env file (located in project's root directory) that should be included in .gitignore to prevent
+// accidental uploads of the secrets.
+
+// Certificates can also be read-in from files via NodeJS's fs module. However, they should never be
+// stored in the project's directory. Production apps should fetch certificates from
+// Azure KeyVault (https://azure.microsoft.com/products/key-vault), or other secure key vaults.
+
+// Please see "Certificates and Secrets" (https://learn.microsoft.com/azure/active-directory/develop/security-best-practices-for-app-registration#certificates-and-secrets)
+// for more information.
+const privateKeySource = fs.readFileSync('<path_to_key>/certs/example.key');
 
 const privateKeyObject = crypto.createPrivateKey({
     key: privateKeySource,
@@ -32,7 +42,7 @@ const config = {
         clientId: "ENTER_CLIENT_ID",
         authority: "https://login.microsoftonline.com/ENTER_TENANT_ID",
         clientCertificate: {
-            thumbprint: "ENTER_CERTIFICATE_THUMBPRINT", // can be obtained when uploading certificate to Azure AD
+            thumbprint: process.env.ENTER_CERTIFICATE_THUMBPRINT, // can be obtained when uploading certificate to Azure AD
             privateKey: privateKey,
         }
     },
@@ -64,9 +74,8 @@ app.get('/', (req, res) => {
 
     // get url to sign user in and consent to scopes needed for application
     cca.getAuthCodeUrl(authCodeUrlParameters).then((response) => {
-        console.log(response);
         res.redirect(response);
-    }).catch((error) => console.log(JSON.stringify(error)));
+    });
 });
 
 app.post('/redirect', (req, res) => {
@@ -77,11 +86,9 @@ app.post('/redirect', (req, res) => {
     };
 
     cca.acquireTokenByCode(tokenRequest).then((response) => {
-        console.log("\nResponse: \n:", response);
         res.status(200).send('Congratulations! You have signed in successfully');
     }).catch((error) => {
-        console.log(error);
-        res.status(500).send(error);
+        res.status(500).send(error.errorMessage);
     });
 });
 

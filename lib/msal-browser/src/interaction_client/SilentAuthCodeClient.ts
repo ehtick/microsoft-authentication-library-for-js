@@ -3,25 +3,58 @@
  * Licensed under the MIT License.
  */
 
-import { AuthenticationResult, ICrypto, Logger, CommonAuthorizationCodeRequest, AuthError, Constants, IPerformanceClient } from "@azure/msal-common";
-import { StandardInteractionClient } from "./StandardInteractionClient";
-import { AuthorizationUrlRequest } from "../request/AuthorizationUrlRequest";
-import { BrowserConfiguration } from "../config/Configuration";
-import { BrowserCacheManager } from "../cache/BrowserCacheManager";
-import { EventHandler } from "../event/EventHandler";
-import { INavigationClient } from "../navigation/INavigationClient";
-import { BrowserAuthError } from "../error/BrowserAuthError";
-import { InteractionType, ApiId } from "../utils/BrowserConstants";
-import { SilentHandler } from "../interaction_handler/SilentHandler";
-import { AuthorizationCodeRequest } from "../request/AuthorizationCodeRequest";
-import { HybridSpaAuthorizationCodeClient } from "./HybridSpaAuthorizationCodeClient";
-import { NativeMessageHandler } from "../broker/nativeBroker/NativeMessageHandler";
+import {
+    ICrypto,
+    Logger,
+    CommonAuthorizationCodeRequest,
+    AuthError,
+    IPerformanceClient,
+    PerformanceEvents,
+    invokeAsync,
+} from "@azure/msal-common/browser";
+import { StandardInteractionClient } from "./StandardInteractionClient.js";
+import { AuthorizationUrlRequest } from "../request/AuthorizationUrlRequest.js";
+import { BrowserConfiguration } from "../config/Configuration.js";
+import { BrowserCacheManager } from "../cache/BrowserCacheManager.js";
+import { EventHandler } from "../event/EventHandler.js";
+import { INavigationClient } from "../navigation/INavigationClient.js";
+import {
+    createBrowserAuthError,
+    BrowserAuthErrorCodes,
+} from "../error/BrowserAuthError.js";
+import { InteractionType, ApiId } from "../utils/BrowserConstants.js";
+import { AuthorizationCodeRequest } from "../request/AuthorizationCodeRequest.js";
+import { HybridSpaAuthorizationCodeClient } from "./HybridSpaAuthorizationCodeClient.js";
+import { NativeMessageHandler } from "../broker/nativeBroker/NativeMessageHandler.js";
+import { AuthenticationResult } from "../response/AuthenticationResult.js";
+import { InteractionHandler } from "../interaction_handler/InteractionHandler.js";
 
 export class SilentAuthCodeClient extends StandardInteractionClient {
     private apiId: ApiId;
 
-    constructor(config: BrowserConfiguration, storageImpl: BrowserCacheManager, browserCrypto: ICrypto, logger: Logger, eventHandler: EventHandler, navigationClient: INavigationClient, apiId: ApiId, performanceClient: IPerformanceClient, nativeMessageHandler?: NativeMessageHandler, correlationId?: string) {
-        super(config, storageImpl, browserCrypto, logger, eventHandler, navigationClient, performanceClient, nativeMessageHandler, correlationId);
+    constructor(
+        config: BrowserConfiguration,
+        storageImpl: BrowserCacheManager,
+        browserCrypto: ICrypto,
+        logger: Logger,
+        eventHandler: EventHandler,
+        navigationClient: INavigationClient,
+        apiId: ApiId,
+        performanceClient: IPerformanceClient,
+        nativeMessageHandler?: NativeMessageHandler,
+        correlationId?: string
+    ) {
+        super(
+            config,
+            storageImpl,
+            browserCrypto,
+            logger,
+            eventHandler,
+            navigationClient,
+            performanceClient,
+            nativeMessageHandler,
+            correlationId
+        );
         this.apiId = apiId;
     }
 
@@ -29,56 +62,87 @@ export class SilentAuthCodeClient extends StandardInteractionClient {
      * Acquires a token silently by redeeming an authorization code against the /token endpoint
      * @param request
      */
-    async acquireToken(request: AuthorizationCodeRequest): Promise<AuthenticationResult> {
-        this.logger.trace("SilentAuthCodeClient.acquireToken called");
-
+    async acquireToken(
+        request: AuthorizationCodeRequest
+    ): Promise<AuthenticationResult> {
         // Auth code payload is required
         if (!request.code) {
-            throw BrowserAuthError.createAuthCodeRequiredError();
-
+            throw createBrowserAuthError(
+                BrowserAuthErrorCodes.authCodeRequired
+            );
         }
 
         // Create silent request
-        const silentRequest: AuthorizationUrlRequest = await this.initializeAuthorizationRequest(request, InteractionType.Silent);
-        this.browserStorage.updateCacheEntries(silentRequest.state, silentRequest.nonce, silentRequest.authority, silentRequest.loginHint || Constants.EMPTY_STRING, silentRequest.account || null);
+        const silentRequest: AuthorizationUrlRequest = await invokeAsync(
+            this.initializeAuthorizationRequest.bind(this),
+            PerformanceEvents.StandardInteractionClientInitializeAuthorizationRequest,
+            this.logger,
+            this.performanceClient,
+            request.correlationId
+        )(request, InteractionType.Silent);
 
-        const serverTelemetryManager = this.initializeServerTelemetryManager(this.apiId);
+        const serverTelemetryManager = this.initializeServerTelemetryManager(
+            this.apiId
+        );
 
         try {
-
             // Create auth code request (PKCE not needed)
             const authCodeRequest: CommonAuthorizationCodeRequest = {
                 ...silentRequest,
-                code: request.code
+                code: request.code,
             };
 
             // Initialize the client
-            const clientConfig = await this.getClientConfiguration(serverTelemetryManager, silentRequest.authority);
-            const authClient: HybridSpaAuthorizationCodeClient = new HybridSpaAuthorizationCodeClient(clientConfig);
+            const clientConfig = await invokeAsync(
+                this.getClientConfiguration.bind(this),
+                PerformanceEvents.StandardInteractionClientGetClientConfiguration,
+                this.logger,
+                this.performanceClient,
+                request.correlationId
+            )({
+                serverTelemetryManager,
+                requestAuthority: silentRequest.authority,
+                requestAzureCloudOptions: silentRequest.azureCloudOptions,
+                requestExtraQueryParameters: silentRequest.extraQueryParameters,
+                account: silentRequest.account,
+            });
+            const authClient: HybridSpaAuthorizationCodeClient =
+                new HybridSpaAuthorizationCodeClient(clientConfig);
             this.logger.verbose("Auth code client created");
 
             // Create silent handler
-            const silentHandler = new SilentHandler(authClient, this.browserStorage, authCodeRequest, this.logger, this.config.system.navigateFrameWait);
+            const interactionHandler = new InteractionHandler(
+                authClient,
+                this.browserStorage,
+                authCodeRequest,
+                this.logger,
+                this.performanceClient
+            );
 
             // Handle auth code parameters from request
-            return silentHandler.handleCodeResponseFromServer(
+            return await invokeAsync(
+                interactionHandler.handleCodeResponseFromServer.bind(
+                    interactionHandler
+                ),
+                PerformanceEvents.HandleCodeResponseFromServer,
+                this.logger,
+                this.performanceClient,
+                request.correlationId
+            )(
                 {
                     code: request.code,
                     msgraph_host: request.msGraphHost,
                     cloud_graph_host_name: request.cloudGraphHostName,
-                    cloud_instance_host_name: request.cloudInstanceHostName
+                    cloud_instance_host_name: request.cloudInstanceHostName,
                 },
-                silentRequest.state,
-                authClient.authority,
-                this.networkClient,
+                silentRequest,
                 false
             );
         } catch (e) {
             if (e instanceof AuthError) {
                 (e as AuthError).setCorrelationId(this.correlationId);
+                serverTelemetryManager.cacheFailedRequest(e);
             }
-            serverTelemetryManager.cacheFailedRequest(e);
-            this.browserStorage.cleanRequestByState(silentRequest.state);
             throw e;
         }
     }
@@ -88,6 +152,10 @@ export class SilentAuthCodeClient extends StandardInteractionClient {
      */
     logout(): Promise<void> {
         // Synchronous so we must reject
-        return Promise.reject(BrowserAuthError.createSilentLogoutUnsupportedError());
+        return Promise.reject(
+            createBrowserAuthError(
+                BrowserAuthErrorCodes.silentLogoutUnsupported
+            )
+        );
     }
 }

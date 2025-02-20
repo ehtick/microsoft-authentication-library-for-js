@@ -3,20 +3,24 @@
  * Licensed under the MIT License.
  */
 
-import puppeteer from "puppeteer";
-
-import { Screenshot, createFolder, setupCredentials, b2cLocalAccountEnterCredentials } from "../../../e2eTestUtils/TestUtils";
-import { NodeCacheTestUtils } from "../../../e2eTestUtils/NodeCacheTestUtils";
-import { LabClient } from "../../../e2eTestUtils/LabClient";
-import { LabApiQueryParams } from "../../../e2eTestUtils/LabApiQueryParams";
-import { B2cProviders, UserTypes } from "../../../e2eTestUtils/Constants";
+import * as puppeteer from "puppeteer";
 import {
-    SCREENSHOT_BASE_FOLDER_NAME,
+    Screenshot,
+    createFolder,
+    setupCredentials,
+    b2cLocalAccountEnterCredentials,
+    RETRY_TIMES,
     validateCacheLocation,
-    SAMPLE_HOME_URL
-} from "../../testUtils";
+    SAMPLE_HOME_URL,
+    NodeCacheTestUtils,
+    LabClient,
+    LabApiQueryParams,
+    B2cProviders,
+    UserTypes,
+} from "e2e-test-utils";
+import path from "path";
 
-import { ConfidentialClientApplication } from "../../../../lib/msal-node/dist";
+import { ConfidentialClientApplication } from "@azure/msal-node";
 
 // Set test cache name/location
 const TEST_CACHE_LOCATION = `${__dirname}/../data/b2c-local.cache.json`;
@@ -31,7 +35,7 @@ const cachePlugin = require("../../cachePlugin.js")(TEST_CACHE_LOCATION);
 const config = require("../config/B2C-Local.json");
 
 describe("B2C User Flow Tests", () => {
-    jest.retryTimes(1);
+    jest.retryTimes(RETRY_TIMES);
     jest.setTimeout(45000);
     let browser: puppeteer.Browser;
     let context: puppeteer.BrowserContext;
@@ -42,9 +46,9 @@ describe("B2C User Flow Tests", () => {
     let username: string;
     let accountPwd: string;
 
-    let clientSecret: { secret: string, value: string };
+    let clientSecret: { secret: string; value: string };
 
-    const screenshotFolder = `${SCREENSHOT_BASE_FOLDER_NAME}/user-flows/local-account`;
+    const screenshotFolder = path.join(__dirname, "screenshots/b2c-user-flows/local");
 
     beforeAll(async () => {
         createFolder(screenshotFolder);
@@ -58,14 +62,19 @@ describe("B2C User Flow Tests", () => {
 
         const labApiParams: LabApiQueryParams = {
             userType: UserTypes.B2C,
-            b2cProvider: B2cProviders.LOCAL
+            b2cProvider: B2cProviders.LOCAL,
         };
 
         const labClient = new LabClient();
 
-        clientSecret = await labClient.getSecret('MSIDLABB2C-MSAapp-AppSecret');
-        const envResponse = await labClient.getVarsByCloudEnvironment(labApiParams);
-        [username, accountPwd] = await setupCredentials(envResponse[0], labClient);
+        clientSecret = await labClient.getSecret("MSIDLABB2C-MSAapp-AppSecret");
+        const envResponse = await labClient.getVarsByCloudEnvironment(
+            labApiParams
+        );
+        [username, accountPwd] = await setupCredentials(
+            envResponse[0],
+            labClient
+        );
     });
 
     afterAll(async () => {
@@ -77,17 +86,17 @@ describe("B2C User Flow Tests", () => {
         let server: any;
 
         beforeAll(async () => {
-
             cca = new ConfidentialClientApplication({
                 auth: {
                     clientId: config.authOptions.clientId,
                     clientSecret: clientSecret.value,
-                    authority: config.policies.authorities.signUpSignIn.authority,
+                    authority:
+                        config.policies.authorities.signUpSignIn.authority,
                     knownAuthorities: [config.policies.authorityDomain],
                 },
                 cache: {
-                    cachePlugin
-                }
+                    cachePlugin,
+                },
             });
 
             server = main(config, cca, port, config.authOptions.redirectUri);
@@ -101,10 +110,10 @@ describe("B2C User Flow Tests", () => {
         });
 
         beforeEach(async () => {
-            context = await browser.createIncognitoBrowserContext();
+            context = await browser.createBrowserContext();
             page = await context.newPage();
             page.setDefaultTimeout(5000);
-            page.on("dialog", async dialog => {
+            page.on("dialog", async (dialog) => {
                 console.log(dialog.message());
                 await dialog.dismiss();
             });
@@ -117,23 +126,31 @@ describe("B2C User Flow Tests", () => {
         });
 
         it("Performs edit profile", async () => {
-            const screenshot = new Screenshot(`${screenshotFolder}/edit-profile`);
+            const screenshot = new Screenshot(
+                `${screenshotFolder}/edit-profile`
+            );
             let displayName = (Math.random() + 1).toString(36).substring(7); // generate a random string
             await page.goto(homeRoute);
             await page.click("#signIn");
-            await b2cLocalAccountEnterCredentials(page, screenshot, username, accountPwd);
-            await page.waitForFunction(`window.location.href.startsWith("${SAMPLE_HOME_URL}")`);
+            await b2cLocalAccountEnterCredentials(
+                page,
+                screenshot,
+                username,
+                accountPwd
+            );
+            await page.waitForFunction(
+                `window.location.href.startsWith("${SAMPLE_HOME_URL}")`
+            );
 
             await page.click("#editProfile");
             await page.waitForSelector("#attributeVerification");
 
-            await Promise.all([
-                page.$eval('#displayName', (el: any) => el.value = ''), // clear the text field
-                page.type("#displayName", `${displayName}`),
-            ]);
-
-            await page.click("#continue");
-            await page.waitForFunction(`window.location.href.startsWith("${SAMPLE_HOME_URL}")`);
+            await page.$eval("#displayName", (el: any) => (el.value = "")), // clear the text field
+                await page.type("#displayName", `${displayName}`),
+                await page.click("#continue");
+            await page.waitForFunction(
+                `window.location.href.startsWith("${SAMPLE_HOME_URL}")`
+            );
 
             await page.click("#viewId");
             await page.waitForSelector("#idTokenInfo");

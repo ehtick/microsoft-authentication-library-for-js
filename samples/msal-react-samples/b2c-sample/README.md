@@ -9,8 +9,6 @@ This sample was bootstrapped with [Create React App](https://github.com/facebook
 
 Implementing B2C user-flows is a matter of initiating authorization requests against the corresponding authorities. This sample demonstrates the [sign-up/sign-in](https://docs.microsoft.com/azure/active-directory-b2c/add-sign-up-and-sign-in-policy?pivots=b2c-user-flow) user-flow with [self-service password reset](https://docs.microsoft.com/azure/active-directory-b2c/add-password-reset-policy?pivots=b2c-user-flow#self-service-password-reset-recommended).
 
-> If you do need to support legacy user-flows, such as legacy password reset user-flow, please refer to the [Angular B2C sample](../../msal-angular-v2-samples/angular-b2c-sample-app/) for an illustration.
-
 ## Notable files and what they demonstrate
 
 1. `./src/App.js` - Shows implementation of `MsalProvider`, all children will have access to `@azure/msal-react` context, hooks and components. Also shows how to handle edit profile user-flow.
@@ -50,8 +48,6 @@ These parameters are taken in during runtime to initialize MSAL in `./src/index.
 
 #### Install npm dependencies for sample
 
-##### Installing @azure/msal-react and @azure/msal-browser from local builds
-
 ```bash
 // Install dev dependencies for msal-react and msal-browser from root of repo
 npm install
@@ -59,30 +55,6 @@ npm install
 cd samples/msal-react-samples/b2c-sample
 // Build packages locally
 npm run build:package
-// Install sample dependencies
-npm run install:local
-// Install rest of dependencies
-npm install
-```
-
-Note: If you suspect you are not using the local builds check that the `package.json` file shows the following dependencies:
-
-```
-"@azure/msal-react": "file:../../../lib/msal-react",
-"@azure/msal-browser": "file:../../../lib/msal-browser",
-"react": "file:../../../lib/msal-react/node_modules/react",
-"react-dom": "file:../../../lib/msal-react/node_modules/react-dom",
-```
-
-##### Installing @azure/msal-react and @azure/msal-browser from released versions available on npm
-
-```bash
-// Change directory to sample directory
-cd samples/msal-react-samples/b2c-sample
-// Install packages from npm
-npm run install:published
-// Install rest of dependencies
-npm install
 ```
 
 #### Running the sample development server

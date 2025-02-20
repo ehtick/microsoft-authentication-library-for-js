@@ -3,43 +3,37 @@
  * Licensed under the MIT License.
  */
 
-import { InteractionType } from "./BrowserConstants";
-import { StringUtils, ClientAuthError, ICrypto, RequestStateObject, ProtocolUtils, ServerAuthorizationCodeResponse, UrlString } from "@azure/msal-common";
+import { InteractionType } from "./BrowserConstants.js";
+import {
+    ICrypto,
+    RequestStateObject,
+    ProtocolUtils,
+    createClientAuthError,
+    ClientAuthErrorCodes,
+} from "@azure/msal-common/browser";
 
 export type BrowserStateObject = {
-    interactionType: InteractionType
+    interactionType: InteractionType;
 };
 
-export class BrowserProtocolUtils {
-
-    /**
-     * Extracts the BrowserStateObject from the state string.
-     * @param browserCrypto 
-     * @param state 
-     */
-    static extractBrowserRequestState(browserCrypto: ICrypto, state: string): BrowserStateObject | null {
-        if (StringUtils.isEmpty(state)) {
-            return null;
-        }
-
-        try {
-            const requestStateObj: RequestStateObject = ProtocolUtils.parseRequestState(browserCrypto, state);
-            return requestStateObj.libraryState.meta as BrowserStateObject;
-        } catch (e) {
-            throw ClientAuthError.createInvalidStateError(state, e);
-        }
+/**
+ * Extracts the BrowserStateObject from the state string.
+ * @param browserCrypto
+ * @param state
+ */
+export function extractBrowserRequestState(
+    browserCrypto: ICrypto,
+    state: string
+): BrowserStateObject | null {
+    if (!state) {
+        return null;
     }
 
-    /**
-     * Parses properties of server response from url hash
-     * @param locationHash Hash from url
-     */
-    static parseServerResponseFromHash(locationHash: string): ServerAuthorizationCodeResponse {
-        if (!locationHash) {
-            return {};
-        }
-        
-        const hashUrlString = new UrlString(locationHash);
-        return UrlString.getDeserializedHash(hashUrlString.getHash());
+    try {
+        const requestStateObj: RequestStateObject =
+            ProtocolUtils.parseRequestState(browserCrypto, state);
+        return requestStateObj.libraryState.meta as BrowserStateObject;
+    } catch (e) {
+        throw createClientAuthError(ClientAuthErrorCodes.invalidState);
     }
 }

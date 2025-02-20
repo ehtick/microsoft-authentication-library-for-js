@@ -11,8 +11,11 @@ This sample was bootstrapped with [Learn Next.js](https://nextjs.org/learn).
 1. `./pages/index.js` - Homepage, shows how to conditionally render content using `AuthenticatedTemplate` and `UnauthenticatedTemplate` depending on whether or not a user is signed in.
 1. `./pages/profile.js` - Example of a protected route using `MsalAuthenticationTemplate`. If a user is not yet signed in, signin will be invoked automatically. If a user is signed in it will acquire an access token and make a call to MS Graph to fetch user profile data.
 1. `./src/authConfig.js` - Configuration options for `PublicClientApplication` and token requests
-1. `./src/ui.js` - Example of how to invoke login/logout as a result of user interaction (clicking a button) and conditionally rendering a Sign In or Sign Out button using the `useIsAuthenticated` hook.
-1. `./src/NavigationClient.js` - Example implementation of `INavigationClient` which can be used to override the default navigation functions MSAL.js uses
+1. `./src/ui-components/SignInSignOutButton.jsx` - Example of how to conditionally render a Sign In or Sign Out button using the `useIsAuthenticated` hook.
+1. `./src/ui-components/SignInButton.jsx` - Example of how to get the `PublicClientApplication` instance using the `useMsal` hook and invoking a login function.
+1. `./src/ui-components/SignOutButton.jsx` - Example of how to get the `PublicClientApplication` instance using the `useMsal` hook and invoking a logout function.
+1. `./src/utils/MsGraphApiCall.js` - Example of how to call the MS Graph API with an access token.
+1. `./src/utils/NavigationClient.js` - Example implementation of `INavigationClient` which can be used to override the default navigation functions MSAL.js uses
 
 ## How to run the sample
 
@@ -29,8 +32,6 @@ This sample was bootstrapped with [Learn Next.js](https://nextjs.org/learn).
 
 #### Install npm dependencies for sample
 
-##### Installing @azure/msal-react and @azure/msal-browser from local builds
-
 ```bash
 # Install dev dependencies for msal-react and msal-browser from root of repo
 npm install
@@ -40,34 +41,6 @@ cd samples/msal-react-samples/nextjs-sample
 
 # Build packages locally
 npm run build:package
-
-# Install local libs
-npm run install:local
-
-# Install sample dependencies
-npm install
-```
-
-Note: If you suspect you are not using the local builds check that the `package.json` file shows the following dependencies:
-
-```
-"@azure/msal-react": "file:../../../lib/msal-react",
-"@azure/msal-browser": "file:../../../lib/msal-browser",
-"react": "file:../../../lib/msal-react/node_modules/react",
-"react-dom": "file:../../../lib/msal-react/node_modules/react-dom",
-```
-
-##### Installing @azure/msal-react and @azure/msal-browser from released versions available on npm
-
-```bash
-# Change directory to sample directory
-cd samples/msal-react-samples/nextjs-sample
-
-# Install packages from npm
-npm run install:published
-
-# Install rest of dependencies
-npm install
 ```
 
 #### Running the sample development server

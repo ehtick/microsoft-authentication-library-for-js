@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMsal } from "@azure/msal-react";
-import Button from "@material-ui/core/Button";
-import MenuItem from '@material-ui/core/MenuItem';
-import Menu from '@material-ui/core/Menu';
+import Button from "@mui/material/Button";
+import MenuItem from '@mui/material/MenuItem';
+import Menu from '@mui/material/Menu';
 import { loginRequest } from "../authConfig";
 
 export const SignInButton = () => {
@@ -15,7 +15,15 @@ export const SignInButton = () => {
         setAnchorEl(null);
 
         if (loginType === "popup") {
-            instance.loginPopup(loginRequest);
+        /**
+         * When using popup and silent APIs, we recommend setting the redirectUri to a blank page or a page 
+         * that does not implement MSAL. Keep in mind that all redirect routes must be registered with the application
+         * For more information, visit: https://github.com/AzureAD/microsoft-authentication-library-for-js/blob/dev/lib/msal-browser/docs/login-user.md#redirecturi-considerations 
+         */
+            instance.loginPopup({
+                ...loginRequest,
+                redirectUri: process.env.REACT_APP_POPUP_REDIRECT_URI, // e.g. /redirect
+            });
         } else if (loginType === "redirect") {
             instance.loginRedirect(loginRequest);
         }
