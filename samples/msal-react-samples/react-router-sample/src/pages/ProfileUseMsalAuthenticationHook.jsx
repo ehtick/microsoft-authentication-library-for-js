@@ -11,11 +11,14 @@ import { ErrorComponent } from "../ui-components/ErrorComponent";
 import { callMsGraph } from "../utils/MsGraphApiCall";
 
 // Material-ui imports
-import Paper from "@material-ui/core/Paper";
+import Paper from "@mui/material/Paper";
 
 const ProfileContent = () => {
     const [graphData, setGraphData] = useState(null);
-    const { result, error } = useMsalAuthentication(InteractionType.Popup, loginRequest);
+    const { result, error } = useMsalAuthentication(InteractionType.Popup, {
+        ...loginRequest,
+        redirectUri: process.env.REACT_APP_POPUP_REDIRECT_URI, // e.g. /redirect
+    });
 
     useEffect(() => {
         if (!!graphData) {

@@ -3,9 +3,16 @@
  * Licensed under the MIT License.
  */
 
-import { BrowserAuthError } from "../error/BrowserAuthError";
-import { DB_NAME, DB_TABLE_NAME, DB_VERSION } from "../utils/BrowserConstants";
-import { IAsyncStorage } from "./IAsyncMemoryStorage";
+import {
+    createBrowserAuthError,
+    BrowserAuthErrorCodes,
+} from "../error/BrowserAuthError.js";
+import {
+    DB_NAME,
+    DB_TABLE_NAME,
+    DB_VERSION,
+} from "../utils/BrowserConstants.js";
+import { IAsyncStorage } from "./IAsyncStorage.js";
 
 interface IDBOpenDBRequestEvent extends Event {
     target: IDBOpenDBRequest & EventTarget;
@@ -23,7 +30,7 @@ interface IDBRequestEvent extends Event {
  * Storage wrapper for IndexedDB storage in browsers: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
  */
 export class DatabaseStorage<T> implements IAsyncStorage<T> {
-    private db: IDBDatabase|undefined;
+    private db: IDBDatabase | undefined;
     private dbName: string;
     private tableName: string;
     private version: number;
@@ -42,17 +49,26 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
     async open(): Promise<void> {
         return new Promise((resolve, reject) => {
             const openDB = window.indexedDB.open(this.dbName, this.version);
-            openDB.addEventListener("upgradeneeded", (e: IDBVersionChangeEvent) => {
-                const event = e as IDBOpenOnUpgradeNeededEvent;
-                event.target.result.createObjectStore(this.tableName);
-            });
+            openDB.addEventListener(
+                "upgradeneeded",
+                (e: IDBVersionChangeEvent) => {
+                    const event = e as IDBOpenOnUpgradeNeededEvent;
+                    event.target.result.createObjectStore(this.tableName);
+                }
+            );
             openDB.addEventListener("success", (e: Event) => {
                 const event = e as IDBOpenDBRequestEvent;
                 this.db = event.target.result;
                 this.dbOpen = true;
                 resolve();
             });
-            openDB.addEventListener("error",  () => reject(BrowserAuthError.createDatabaseUnavailableError()));
+            openDB.addEventListener("error", () =>
+                reject(
+                    createBrowserAuthError(
+                        BrowserAuthErrorCodes.databaseUnavailable
+                    )
+                )
+            );
         });
     }
 
@@ -73,25 +89,32 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
      */
     private async validateDbIsOpen(): Promise<void> {
         if (!this.dbOpen) {
-            return await this.open();
+            return this.open();
         }
     }
 
     /**
      * Retrieves item from IndexedDB instance.
-     * @param key 
+     * @param key
      */
     async getItem(key: string): Promise<T | null> {
         await this.validateDbIsOpen();
         return new Promise<T>((resolve, reject) => {
             // TODO: Add timeouts?
             if (!this.db) {
-                return reject(BrowserAuthError.createDatabaseNotOpenError());
+                return reject(
+                    createBrowserAuthError(
+                        BrowserAuthErrorCodes.databaseNotOpen
+                    )
+                );
             }
-            const transaction = this.db.transaction([this.tableName], "readonly");
+            const transaction = this.db.transaction(
+                [this.tableName],
+                "readonly"
+            );
             const objectStore = transaction.objectStore(this.tableName);
             const dbGet = objectStore.get(key);
-            
+
             dbGet.addEventListener("success", (e: Event) => {
                 const event = e as IDBRequestEvent;
                 this.closeConnection();
@@ -107,17 +130,24 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
 
     /**
      * Adds item to IndexedDB under given key
-     * @param key 
-     * @param payload 
+     * @param key
+     * @param payload
      */
     async setItem(key: string, payload: T): Promise<void> {
         await this.validateDbIsOpen();
         return new Promise<void>((resolve: Function, reject: Function) => {
             // TODO: Add timeouts?
             if (!this.db) {
-                return reject(BrowserAuthError.createDatabaseNotOpenError());
+                return reject(
+                    createBrowserAuthError(
+                        BrowserAuthErrorCodes.databaseNotOpen
+                    )
+                );
             }
-            const transaction = this.db.transaction([this.tableName], "readwrite");
+            const transaction = this.db.transaction(
+                [this.tableName],
+                "readwrite"
+            );
 
             const objectStore = transaction.objectStore(this.tableName);
 
@@ -143,10 +173,17 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
         await this.validateDbIsOpen();
         return new Promise<void>((resolve: Function, reject: Function) => {
             if (!this.db) {
-                return reject(BrowserAuthError.createDatabaseNotOpenError());
+                return reject(
+                    createBrowserAuthError(
+                        BrowserAuthErrorCodes.databaseNotOpen
+                    )
+                );
             }
 
-            const transaction = this.db.transaction([this.tableName], "readwrite");
+            const transaction = this.db.transaction(
+                [this.tableName],
+                "readwrite"
+            );
             const objectStore = transaction.objectStore(this.tableName);
             const dbDelete = objectStore.delete(key);
 
@@ -169,10 +206,17 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
         await this.validateDbIsOpen();
         return new Promise<string[]>((resolve: Function, reject: Function) => {
             if (!this.db) {
-                return reject(BrowserAuthError.createDatabaseNotOpenError());
+                return reject(
+                    createBrowserAuthError(
+                        BrowserAuthErrorCodes.databaseNotOpen
+                    )
+                );
             }
 
-            const transaction = this.db.transaction([this.tableName], "readonly");
+            const transaction = this.db.transaction(
+                [this.tableName],
+                "readonly"
+            );
             const objectStore = transaction.objectStore(this.tableName);
             const dbGetKeys = objectStore.getAllKeys();
 
@@ -182,7 +226,7 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
                 resolve(event.target.result);
             });
 
-            dbGetKeys.addEventListener("error",  (e: Event) => {
+            dbGetKeys.addEventListener("error", (e: Event) => {
                 this.closeConnection();
                 reject(e);
             });
@@ -190,7 +234,7 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
     }
 
     /**
-     * 
+     *
      * Checks whether there is an object under the search key in the object store
      */
     async containsKey(key: string): Promise<boolean> {
@@ -198,10 +242,17 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
 
         return new Promise<boolean>((resolve: Function, reject: Function) => {
             if (!this.db) {
-                return reject(BrowserAuthError.createDatabaseNotOpenError());
+                return reject(
+                    createBrowserAuthError(
+                        BrowserAuthErrorCodes.databaseNotOpen
+                    )
+                );
             }
 
-            const transaction = this.db.transaction([this.tableName], "readonly");
+            const transaction = this.db.transaction(
+                [this.tableName],
+                "readonly"
+            );
             const objectStore = transaction.objectStore(this.tableName);
             const dbContainsKey = objectStore.count(key);
 
@@ -232,9 +283,19 @@ export class DatabaseStorage<T> implements IAsyncStorage<T> {
 
         return new Promise<boolean>((resolve: Function, reject: Function) => {
             const deleteDbRequest = window.indexedDB.deleteDatabase(DB_NAME);
-            deleteDbRequest.addEventListener("success", () => resolve(true));
-            deleteDbRequest.addEventListener("blocked", () => resolve(true));
-            deleteDbRequest.addEventListener("error", () => reject(false));
+            const id = setTimeout(() => reject(false), 200); // Reject if events aren't raised within 200ms
+            deleteDbRequest.addEventListener("success", () => {
+                clearTimeout(id);
+                return resolve(true);
+            });
+            deleteDbRequest.addEventListener("blocked", () => {
+                clearTimeout(id);
+                return resolve(true);
+            });
+            deleteDbRequest.addEventListener("error", () => {
+                clearTimeout(id);
+                return reject(false);
+            });
         });
     }
 }

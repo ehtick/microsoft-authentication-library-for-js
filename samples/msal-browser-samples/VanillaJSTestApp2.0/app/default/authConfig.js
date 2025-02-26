@@ -1,8 +1,9 @@
 // Config object to be passed to Msal on creation
 const msalConfig = {
     auth: {
-        clientId: "3fba556e-5d4a-48e3-8e1a-fd57c12cb82e",
-        authority: "https://login.windows-ppe.net/common/"
+        clientId: "b5c2e510-4a17-4feb-b219-e55aa5b74144",
+        authority:
+            "https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47",
     },
     cache: {
         cacheLocation: "sessionStorage", // This configures where your cache will be stored
@@ -12,56 +13,56 @@ const msalConfig = {
         loggerOptions: {
             logLevel: msal.LogLevel.Trace,
             loggerCallback: (level, message, containsPii) => {
-                if (containsPii) {	
-                    return;	
+                if (containsPii) {
+                    return;
                 }
-                switch (level) {	
-                    case msal.LogLevel.Error:	
-                        console.error(message);	
-                        return;	
-                    case msal.LogLevel.Info:	
-                        console.info(message);	
-                        return;	
-                    case msal.LogLevel.Verbose:	
-                        console.debug(message);	
-                        return;	
-                    case msal.LogLevel.Warning:	
-                        console.warn(message);	
-                        return;	
+                switch (level) {
+                    case msal.LogLevel.Error:
+                        console.error(message);
+                        return;
+                    case msal.LogLevel.Info:
+                        console.info(message);
+                        return;
+                    case msal.LogLevel.Verbose:
+                        console.debug(message);
+                        return;
+                    case msal.LogLevel.Warning:
+                        console.warn(message);
+                        return;
                     default:
                         console.log(message);
                         return;
                 }
-            }
-        }
+            },
+        },
     },
     telemetry: {
         application: {
             appName: "MSAL Browser V2 Default Sample",
-            appVersion: "1.0.0"
-        }
-    }
+            appVersion: "1.0.0",
+        },
+    },
 };
 
 // Add here scopes for id token to be used at MS Identity Platform endpoints.
 const loginRequest = {
-    scopes: ["User.Read"]
+    scopes: ["User.Read"],
 };
 
 // Add here the endpoints for MS Graph API services you would like to use.
 const graphConfig = {
-    graphMeEndpoint: "https://graph.microsoft-ppe.com/v1.0/me",
-    graphMailEndpoint: "https://graph.microsoft-ppe.com/v1.0/me/messages"
+    graphMeEndpoint: "https://graph.microsoft.com/v1.0/me",
+    graphMailEndpoint: "https://graph.microsoft.com/v1.0/me/messages",
 };
 
 // Add here scopes for access token to be used at MS Graph API endpoints.
 const tokenRequest = {
     scopes: ["Mail.Read"],
-    forceRefresh: false // Set this to "true" to skip a cached token and go to the server to get a new token
+    forceRefresh: false, // Set this to "true" to skip a cached token and go to the server to get a new token
 };
 
 const silentRequest = {
-    scopes: ["openid", "profile", "User.Read", "Mail.Read"]
+    scopes: ["openid", "profile", "User.Read", "Mail.Read"],
 };
 
-const logoutRequest = {}
+const logoutRequest = {};

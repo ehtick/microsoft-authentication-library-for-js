@@ -1,18 +1,33 @@
 {
-  "include": ["src", "types"],
+  "include": [
+    "src",
+    "test"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
   "compilerOptions": {
-    "module": "esnext",
-    "lib": ["dom", "esnext"],
+    "module": "nodenext",
+    "target": "es2020",
+    "moduleResolution": "nodenext",
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "importHelpers": true,
+    "composite": false,
     "declaration": true,
     "sourceMap": true,
-    "rootDir": "./src",
+    "rootDir": "./",
+    "outDir": "./dist",
     "noUnusedLocals": true,
     "baseUrl": "./",
-    "paths": {
-      "*": ["src/*", "node_modules/*", "build/"]
-    },
     "jsx": "react",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "strict": true,
+    "types": [
+      "node",
+      "jest"
+    ]
   }
 }

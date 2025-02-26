@@ -3,11 +3,38 @@
  * Licensed under the MIT License.
  */
 
-import { ClientConfiguration, Constants, PkceCodes, ClientAuthError, AccountEntity, CredentialEntity, AppMetadataEntity, ThrottlingEntity, IdTokenEntity, AccessTokenEntity, RefreshTokenEntity, CredentialType, ProtocolMode , AuthorityFactory, AuthorityOptions, AuthorityMetadataEntity, ValidCredentialType } from "../../src";
-import { AUTHENTICATION_RESULT, ID_TOKEN_CLAIMS, RANDOM_TEST_GUID, TEST_CONFIG, TEST_CRYPTO_VALUES, TEST_POP_VALUES, TEST_TOKENS } from "../test_kit/StringConstants";
+import {
+    RANDOM_TEST_GUID,
+    TEST_CONFIG,
+    TEST_CRYPTO_VALUES,
+    TEST_POP_VALUES,
+} from "../test_kit/StringConstants.js";
 
-import { CacheManager } from "../../src/cache/CacheManager";
-import { ServerTelemetryEntity } from "../../src/cache/entities/ServerTelemetryEntity";
+import { CacheManager } from "../../src/cache/CacheManager.js";
+import { ServerTelemetryEntity } from "../../src/cache/entities/ServerTelemetryEntity.js";
+import { AccountEntity } from "../../src/cache/entities/AccountEntity.js";
+import { IdTokenEntity } from "../../src/cache/entities/IdTokenEntity.js";
+import * as CacheHelpers from "../../src/cache/utils/CacheHelpers.js";
+import { AccessTokenEntity } from "../../src/cache/entities/AccessTokenEntity.js";
+import { RefreshTokenEntity } from "../../src/cache/entities/RefreshTokenEntity.js";
+import { AppMetadataEntity } from "../../src/cache/entities/AppMetadataEntity.js";
+import { AuthorityMetadataEntity } from "../../src/cache/entities/AuthorityMetadataEntity.js";
+import { ThrottlingEntity } from "../../src/cache/entities/ThrottlingEntity.js";
+import { ProtocolMode } from "../../src/authority/ProtocolMode.js";
+import { ClientConfiguration } from "../../src/config/ClientConfiguration.js";
+import { Logger, LogLevel } from "../../src/logger/Logger.js";
+import { Authority } from "../../src/authority/Authority.js";
+import {
+    ClientAuthErrorCodes,
+    createClientAuthError,
+} from "../../src/error/ClientAuthError.js";
+import { ServerTelemetryManager } from "../../src/telemetry/server/ServerTelemetryManager.js";
+import { Constants } from "../../src/utils/Constants.js";
+import { AuthorityOptions } from "../../src/authority/AuthorityOptions.js";
+import { TokenKeys } from "../../src/cache/utils/CacheTypes.js";
+
+const ACCOUNT_KEYS = "ACCOUNT_KEYS";
+const TOKEN_KEYS = "TOKEN_KEYS";
 
 export class MockStorageClass extends CacheManager {
     store = {};
@@ -20,48 +47,85 @@ export class MockStorageClass extends CacheManager {
         }
         return null;
     }
-    setAccount(value: AccountEntity): void {
+
+    async setAccount(value: AccountEntity): Promise<void> {
         const key = value.generateAccountKey();
         this.store[key] = value;
+
+        const currentAccounts = this.getAccountKeys();
+        if (!currentAccounts.includes(key)) {
+            currentAccounts.push(key);
+            this.store[ACCOUNT_KEYS] = currentAccounts;
+        }
+    }
+
+    async removeAccount(key: string): Promise<void> {
+        await super.removeAccount(key);
+        const currentAccounts = this.getAccountKeys();
+        const removalIndex = currentAccounts.indexOf(key);
+        if (removalIndex > -1) {
+            currentAccounts.splice(removalIndex, 1);
+            this.store[ACCOUNT_KEYS] = currentAccounts;
+        }
+    }
+
+    getAccountKeys(): string[] {
+        return this.store[ACCOUNT_KEYS] || [];
+    }
+
+    getTokenKeys(): TokenKeys {
+        return (
+            this.store[TOKEN_KEYS] || {
+                idToken: [],
+                accessToken: [],
+                refreshToken: [],
+            }
+        );
     }
 
     // Credentials (idtokens)
     getIdTokenCredential(key: string): IdTokenEntity | null {
-        const credType = CredentialEntity.getCredentialType(key);
-        if (credType === CredentialType.ID_TOKEN) {
-            return this.store[key] as IdTokenEntity;
-        }
-        return null;
+        return (this.store[key] as IdTokenEntity) || null;
     }
-    setIdTokenCredential(value: IdTokenEntity): void {
-        const key = value.generateCredentialKey();
+    async setIdTokenCredential(value: IdTokenEntity): Promise<void> {
+        const key = CacheHelpers.generateCredentialKey(value);
         this.store[key] = value;
+
+        const tokenKeys = this.getTokenKeys();
+        if (!tokenKeys.idToken.includes(key)) {
+            tokenKeys.idToken.push(key);
+            this.store[TOKEN_KEYS] = tokenKeys;
+        }
     }
 
     // Credentials (accesstokens)
     getAccessTokenCredential(key: string): AccessTokenEntity | null {
-        const credType = CredentialEntity.getCredentialType(key);
-        if (credType === CredentialType.ACCESS_TOKEN || credType === CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME) {
-            return this.store[key] as AccessTokenEntity;
-        }
-        return null;
+        return (this.store[key] as AccessTokenEntity) || null;
     }
-    setAccessTokenCredential(value: AccessTokenEntity): void {
-        const key = value.generateCredentialKey();
+    async setAccessTokenCredential(value: AccessTokenEntity): Promise<void> {
+        const key = CacheHelpers.generateCredentialKey(value);
         this.store[key] = value;
+
+        const tokenKeys = this.getTokenKeys();
+        if (!tokenKeys.accessToken.includes(key)) {
+            tokenKeys.accessToken.push(key);
+            this.store[TOKEN_KEYS] = tokenKeys;
+        }
     }
 
     // Credentials (accesstokens)
     getRefreshTokenCredential(key: string): RefreshTokenEntity | null {
-        const credType = CredentialEntity.getCredentialType(key);
-        if (credType === CredentialType.REFRESH_TOKEN) {
-            return this.store[key] as RefreshTokenEntity;
-        }
-        return null;
+        return (this.store[key] as RefreshTokenEntity) || null;
     }
-    setRefreshTokenCredential(value: RefreshTokenEntity): void {
-        const key = value.generateCredentialKey();
+    async setRefreshTokenCredential(value: RefreshTokenEntity): Promise<void> {
+        const key = CacheHelpers.generateCredentialKey(value);
         this.store[key] = value;
+
+        const tokenKeys = this.getTokenKeys();
+        if (!tokenKeys.refreshToken.includes(key)) {
+            tokenKeys.refreshToken.push(key);
+            this.store[TOKEN_KEYS] = tokenKeys;
+        }
     }
 
     // AppMetadata
@@ -69,7 +133,7 @@ export class MockStorageClass extends CacheManager {
         return this.store[key] as AppMetadataEntity;
     }
     setAppMetadata(value: AppMetadataEntity): void {
-        const key = value.generateAppMetadataKey();
+        const key = CacheHelpers.generateAppMetadataKey(value);
         this.store[key] = value;
     }
 
@@ -86,7 +150,7 @@ export class MockStorageClass extends CacheManager {
         return this.store[key] as AuthorityMetadataEntity;
     }
     setAuthorityMetadata(key: string, value: AuthorityMetadataEntity): void {
-        this.store[key] = value;
+        this.store[key] = { ...value };
     }
 
     // Throttling cache
@@ -97,13 +161,21 @@ export class MockStorageClass extends CacheManager {
         this.store[key] = value;
     }
 
-    removeItem(key: string): boolean {
-        let result: boolean = false;
+    removeItem(key: string): void {
         if (!!this.store[key]) {
             delete this.store[key];
-            result = true;
+            // Update token keys
+            const tokenKeys = this.store[TOKEN_KEYS];
+            if (tokenKeys?.accessToken.includes(key)) {
+                const index = tokenKeys?.accessToken.indexOf(key);
+                tokenKeys.accessToken.splice(index, 1);
+            }
+            if (tokenKeys?.idToken.includes(key)) {
+                const index = tokenKeys?.idToken.indexOf(key);
+                tokenKeys.idToken.splice(index, 1);
+            }
+            this.store[TOKEN_KEYS] = tokenKeys;
         }
-        return result;
     }
     containsKey(key: string): boolean {
         return !!this.store[key];
@@ -117,20 +189,6 @@ export class MockStorageClass extends CacheManager {
     async clear(): Promise<void> {
         this.store = {};
     }
-    updateCredentialCacheKey(currentCacheKey: string, credential: ValidCredentialType): string {
-        const updatedCacheKey = credential.generateCredentialKey();
-
-        if (currentCacheKey !== updatedCacheKey) {
-            const cacheItem = this.store[currentCacheKey];
-            if (cacheItem) {
-                this.removeItem(currentCacheKey);
-                this.store[updatedCacheKey] = cacheItem;
-                return updatedCacheKey;
-            }
-        }
-
-        return currentCacheKey;
-    }
 }
 
 export const mockCrypto = {
@@ -138,31 +196,18 @@ export const mockCrypto = {
         return RANDOM_TEST_GUID;
     },
     base64Decode(input: string): string {
-        if (AUTHENTICATION_RESULT.body.id_token.includes(input)) {
-            return JSON.stringify(ID_TOKEN_CLAIMS);
-        }
-        switch (input) {
-            case TEST_POP_VALUES.ENCODED_REQ_CNF:
-                return TEST_POP_VALUES.DECODED_REQ_CNF;
-            case TEST_TOKENS.POP_TOKEN_PAYLOAD:
-                return TEST_TOKENS.DECODED_POP_TOKEN_PAYLOAD;
-            default:
-                return input;
-        }
+        return Buffer.from(input, "base64").toString("utf8");
     },
     base64Encode(input: string): string {
-        switch (input) {
-            case TEST_POP_VALUES.DECODED_REQ_CNF:
-                return TEST_POP_VALUES.ENCODED_REQ_CNF;
-            default:
-                return input;
-        }
+        return Buffer.from(input, "utf-8").toString("base64");
     },
-    async generatePkceCodes(): Promise<PkceCodes> {
-        return {
-            challenge: TEST_CONFIG.TEST_CHALLENGE,
-            verifier: TEST_CONFIG.TEST_VERIFIER,
-        };
+    base64UrlEncode(input: string): string {
+        return Buffer.from(input, "utf-8").toString("base64url");
+    },
+    encodeKid(input: string): string {
+        return Buffer.from(JSON.stringify({ kid: input }), "utf-8").toString(
+            "base64url"
+        );
     },
     async getPublicKeyThumbprint(): Promise<string> {
         return TEST_POP_VALUES.KID;
@@ -178,13 +223,22 @@ export const mockCrypto = {
     },
     async hashString(): Promise<string> {
         return Promise.resolve(TEST_CRYPTO_VALUES.TEST_SHA256_HASH);
-    }
+    },
 };
 
 export class ClientTestUtils {
-    
-    static async createTestClientConfiguration(): Promise<ClientConfiguration>{
-        const mockStorage = new MockStorageClass(TEST_CONFIG.MSAL_CLIENT_ID, mockCrypto);
+    static async createTestClientConfiguration(
+        telem: boolean = false,
+        protocolMode: ProtocolMode = ProtocolMode.AAD
+    ): Promise<ClientConfiguration> {
+        const mockStorage = new MockStorageClass(
+            TEST_CONFIG.MSAL_CLIENT_ID,
+            mockCrypto,
+            new Logger({}),
+            {
+                canonicalAuthority: TEST_CONFIG.validAuthority,
+            }
+        );
 
         const testLoggerCallback = (): void => {
             return;
@@ -196,25 +250,56 @@ export class ClientTestUtils {
             },
             sendPostRequestAsync<T>(): T {
                 return {} as T;
-            }
+            },
         };
 
         const authorityOptions: AuthorityOptions = {
-            protocolMode: ProtocolMode.AAD,
+            protocolMode: protocolMode,
             knownAuthorities: [TEST_CONFIG.validAuthority],
             cloudDiscoveryMetadata: "",
-            authorityMetadata: ""
+            authorityMetadata: "",
         };
-        const authority  = AuthorityFactory.createInstance(TEST_CONFIG.validAuthority, mockHttpClient, mockStorage, authorityOptions);
 
-        await authority.resolveEndpointsAsync().catch(error => {
-            throw ClientAuthError.createEndpointDiscoveryIncompleteError(error);
+        const loggerOptions = {
+            loggerCallback: (): void => {},
+            piiLoggingEnabled: true,
+            logLevel: LogLevel.Verbose,
+        };
+        const logger = new Logger(loggerOptions);
+
+        const authority = new Authority(
+            TEST_CONFIG.validAuthority,
+            mockHttpClient,
+            mockStorage,
+            authorityOptions,
+            logger,
+            TEST_CONFIG.CORRELATION_ID
+        );
+
+        await authority.resolveEndpointsAsync().catch((error) => {
+            throw createClientAuthError(
+                ClientAuthErrorCodes.endpointResolutionError
+            );
         });
+
+        let serverTelemetryManager = null;
+
+        if (telem) {
+            serverTelemetryManager = new ServerTelemetryManager(
+                {
+                    clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+                    correlationId: TEST_CONFIG.CORRELATION_ID,
+                    apiId: 866,
+                },
+                mockStorage
+            );
+        }
 
         return {
             authOptions: {
                 clientId: TEST_CONFIG.MSAL_CLIENT_ID,
-                authority: authority
+                authority: authority,
+                redirectUri: "https://localhost",
             },
             storageInterface: mockStorage,
             networkInterface: mockHttpClient,
@@ -223,7 +308,8 @@ export class ClientTestUtils {
                 loggerCallback: testLoggerCallback,
             },
             systemOptions: {
-                tokenRenewalOffsetSeconds: TEST_CONFIG.DEFAULT_TOKEN_RENEWAL_OFFSET
+                tokenRenewalOffsetSeconds:
+                    TEST_CONFIG.DEFAULT_TOKEN_RENEWAL_OFFSET,
             },
             clientCredentials: {
                 clientSecret: TEST_CONFIG.MSAL_CLIENT_SECRET,
@@ -237,9 +323,10 @@ export class ClientTestUtils {
             telemetry: {
                 application: {
                     appName: TEST_CONFIG.applicationName,
-                    appVersion: TEST_CONFIG.applicationVersion
-                }
-            }
+                    appVersion: TEST_CONFIG.applicationVersion,
+                },
+            },
+            serverTelemetryManager: serverTelemetryManager,
         };
     }
 }

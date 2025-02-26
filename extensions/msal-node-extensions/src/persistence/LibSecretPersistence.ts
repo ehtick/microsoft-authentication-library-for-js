@@ -3,13 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { setPassword, getPassword, deletePassword } from "keytar";
-import { FilePersistence } from "./FilePersistence";
-import { IPersistence } from "./IPersistence";
-import { PersistenceError } from "../error/PersistenceError";
-import { Logger, LoggerOptions } from "@azure/msal-common";
+import keytar from "keytar";
+import { FilePersistence } from "./FilePersistence.js";
+import { IPersistence } from "./IPersistence.js";
+import { PersistenceError } from "../error/PersistenceError.js";
+import { Logger, LoggerOptions } from "@azure/msal-common/node";
 import { dirname } from "path";
-import { BasePersistence } from "./BasePersistence";
+import { BasePersistence } from "./BasePersistence.js";
+import { isNodeError } from "../utils/TypeGuards.js";
 
 /**
  * Uses reads and writes passwords to Secret Service API/libsecret. Requires libsecret
@@ -18,14 +19,21 @@ import { BasePersistence } from "./BasePersistence";
  * serviceName: Identifier used as key for whatever value is stored
  * accountName: Account under which password should be stored
  */
-export class LibSecretPersistence extends BasePersistence implements IPersistence {
-
+export class LibSecretPersistence
+    extends BasePersistence
+    implements IPersistence
+{
     protected readonly serviceName;
     protected readonly accountName;
     private filePersistence: FilePersistence;
 
-    private constructor(serviceName: string, accountName: string) {
+    private constructor(
+        filePersistence: FilePersistence,
+        serviceName: string,
+        accountName: string
+    ) {
         super();
+        this.filePersistence = filePersistence;
         this.serviceName = serviceName;
         this.accountName = accountName;
     }
@@ -34,18 +42,33 @@ export class LibSecretPersistence extends BasePersistence implements IPersistenc
         fileLocation: string,
         serviceName: string,
         accountName: string,
-        loggerOptions?: LoggerOptions): Promise<LibSecretPersistence> {
-
-        const persistence = new LibSecretPersistence(serviceName, accountName);
-        persistence.filePersistence = await FilePersistence.create(fileLocation, loggerOptions);
+        loggerOptions?: LoggerOptions
+    ): Promise<LibSecretPersistence> {
+        const filePersistence = await FilePersistence.create(
+            fileLocation,
+            loggerOptions
+        );
+        const persistence = new LibSecretPersistence(
+            filePersistence,
+            serviceName,
+            accountName
+        );
         return persistence;
     }
 
     public async save(contents: string): Promise<void> {
         try {
-            await setPassword(this.serviceName, this.accountName, contents);
+            await keytar.setPassword(
+                this.serviceName,
+                this.accountName,
+                contents
+            );
         } catch (err) {
-            throw PersistenceError.createLibSecretError(err.message);
+            if (isNodeError(err)) {
+                throw PersistenceError.createLibSecretError(err.message);
+            } else {
+                throw err;
+            }
         }
         // Write dummy data to update file mtime
         await this.filePersistence.save("{}");
@@ -53,18 +76,29 @@ export class LibSecretPersistence extends BasePersistence implements IPersistenc
 
     public async load(): Promise<string | null> {
         try {
-            return await getPassword(this.serviceName, this.accountName);
+            return await keytar.getPassword(this.serviceName, this.accountName);
         } catch (err) {
-            throw PersistenceError.createLibSecretError(err.message);
+            if (isNodeError(err)) {
+                throw PersistenceError.createLibSecretError(err.message);
+            } else {
+                throw err;
+            }
         }
     }
 
     public async delete(): Promise<boolean> {
         try {
             await this.filePersistence.delete();
-            return await deletePassword(this.serviceName, this.accountName);
+            return await keytar.deletePassword(
+                this.serviceName,
+                this.accountName
+            );
         } catch (err) {
-            throw PersistenceError.createLibSecretError(err.message);
+            if (isNodeError(err)) {
+                throw PersistenceError.createLibSecretError(err.message);
+            } else {
+                throw err;
+            }
         }
     }
 
@@ -79,12 +113,15 @@ export class LibSecretPersistence extends BasePersistence implements IPersistenc
     public getLogger(): Logger {
         return this.filePersistence.getLogger();
     }
-      
+
     public createForPersistenceValidation(): Promise<LibSecretPersistence> {
-        const testCacheFileLocation = `${dirname(this.filePersistence.getFilePath())}/test.cache`;
+        const testCacheFileLocation = `${dirname(
+            this.filePersistence.getFilePath()
+        )}/test.cache`;
         return LibSecretPersistence.create(
-            testCacheFileLocation, 
-            "persistenceValidationServiceName", "persistencValidationAccountName"
+            testCacheFileLocation,
+            "persistenceValidationServiceName",
+            "persistencValidationAccountName"
         );
     }
 }

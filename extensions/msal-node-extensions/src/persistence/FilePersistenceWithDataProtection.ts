@@ -3,14 +3,15 @@
  * Licensed under the MIT License.
  */
 
-import { IPersistence } from "./IPersistence";
-import { FilePersistence } from "./FilePersistence";
-import { PersistenceError } from "../error/PersistenceError";
-import { Dpapi } from "../dpapi-addon/Dpapi";
-import { DataProtectionScope } from "./DataProtectionScope";
-import { Logger, LoggerOptions } from "@azure/msal-common";
+import { IPersistence } from "./IPersistence.js";
+import { FilePersistence } from "./FilePersistence.js";
+import { PersistenceError } from "../error/PersistenceError.js";
+import { Dpapi } from "../Dpapi.js";
+import { DataProtectionScope } from "./DataProtectionScope.js";
+import { Logger, LoggerOptions } from "@azure/msal-common/node";
 import { dirname } from "path";
-import { BasePersistence } from "./BasePersistence";
+import { BasePersistence } from "./BasePersistence.js";
+import { isNodeError } from "../utils/TypeGuards.js";
 
 /**
  * Uses CryptProtectData and CryptUnprotectData on Windows to encrypt and decrypt file contents.
@@ -18,26 +19,42 @@ import { BasePersistence } from "./BasePersistence";
  * scope: Scope of the data protection. Either local user or the current machine
  * optionalEntropy: Password or other additional entropy used to encrypt the data
  */
-export class FilePersistenceWithDataProtection extends BasePersistence implements IPersistence {
-
+export class FilePersistenceWithDataProtection
+    extends BasePersistence
+    implements IPersistence
+{
     private filePersistence: FilePersistence;
     private scope: DataProtectionScope;
-    private optionalEntropy: Uint8Array;
+    private optionalEntropy: Uint8Array | null;
 
-    private constructor(scope: DataProtectionScope, optionalEntropy?: string) {
+    private constructor(
+        filePersistence: FilePersistence,
+        scope: DataProtectionScope,
+        optionalEntropy?: string
+    ) {
         super();
         this.scope = scope;
-        this.optionalEntropy = optionalEntropy ? Buffer.from(optionalEntropy, "utf-8") : null;
+        this.optionalEntropy = optionalEntropy
+            ? Buffer.from(optionalEntropy, "utf-8")
+            : null;
+        this.filePersistence = filePersistence;
     }
 
     public static async create(
         fileLocation: string,
         scope: DataProtectionScope,
         optionalEntropy?: string,
-        loggerOptions?: LoggerOptions): Promise<FilePersistenceWithDataProtection> {
-
-        const persistence = new FilePersistenceWithDataProtection(scope, optionalEntropy);
-        persistence.filePersistence = await FilePersistence.create(fileLocation, loggerOptions);
+        loggerOptions?: LoggerOptions
+    ): Promise<FilePersistenceWithDataProtection> {
+        const filePersistence = await FilePersistence.create(
+            fileLocation,
+            loggerOptions
+        );
+        const persistence = new FilePersistenceWithDataProtection(
+            filePersistence,
+            scope,
+            optionalEntropy
+        );
         return persistence;
     }
 
@@ -46,26 +63,48 @@ export class FilePersistenceWithDataProtection extends BasePersistence implement
             const encryptedContents = Dpapi.protectData(
                 Buffer.from(contents, "utf-8"),
                 this.optionalEntropy,
-                this.scope.toString());
+                this.scope.toString()
+            );
             await this.filePersistence.saveBuffer(encryptedContents);
         } catch (err) {
-            throw PersistenceError.createFilePersistenceWithDPAPIError(err.message);
+            if (isNodeError(err)) {
+                throw PersistenceError.createFilePersistenceWithDPAPIError(
+                    err.message
+                );
+            } else {
+                throw err;
+            }
         }
     }
 
     public async load(): Promise<string | null> {
         try {
             const encryptedContents = await this.filePersistence.loadBuffer();
-            if (typeof encryptedContents === "undefined" || !encryptedContents || 0 === encryptedContents.length) {
-                this.filePersistence.getLogger().info("Encrypted contents loaded from file were null or empty");
+            if (
+                typeof encryptedContents === "undefined" ||
+                !encryptedContents ||
+                0 === encryptedContents.length
+            ) {
+                this.filePersistence
+                    .getLogger()
+                    .info(
+                        "Encrypted contents loaded from file were null or empty"
+                    );
                 return null;
             }
             return Dpapi.unprotectData(
                 encryptedContents,
                 this.optionalEntropy,
-                this.scope.toString()).toString();
+                this.scope.toString()
+            ).toString();
         } catch (err) {
-            throw PersistenceError.createFilePersistenceWithDPAPIError(err.message);
+            if (isNodeError(err)) {
+                throw PersistenceError.createFilePersistenceWithDPAPIError(
+                    err.message
+                );
+            } else {
+                throw err;
+            }
         }
     }
 
@@ -86,7 +125,12 @@ export class FilePersistenceWithDataProtection extends BasePersistence implement
     }
 
     public createForPersistenceValidation(): Promise<FilePersistenceWithDataProtection> {
-        const testCacheFileLocation = `${dirname(this.filePersistence.getFilePath())}/test.cache`;
-        return FilePersistenceWithDataProtection.create(testCacheFileLocation, DataProtectionScope.CurrentUser);
+        const testCacheFileLocation = `${dirname(
+            this.filePersistence.getFilePath()
+        )}/test.cache`;
+        return FilePersistenceWithDataProtection.create(
+            testCacheFileLocation,
+            DataProtectionScope.CurrentUser
+        );
     }
 }

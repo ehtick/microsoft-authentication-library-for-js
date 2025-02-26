@@ -3,22 +3,33 @@
  * Licensed under the MIT License.
  */
 
-import { IWindowStorage } from "./IWindowStorage";
+import { IWindowStorage } from "./IWindowStorage.js";
 
 export class MemoryStorage<T> implements IWindowStorage<T> {
-
     private cache: Map<string, T>;
 
     constructor() {
         this.cache = new Map<string, T>();
     }
 
+    async initialize(): Promise<void> {
+        // Memory storage does not require initialization
+    }
+
     getItem(key: string): T | null {
         return this.cache.get(key) || null;
     }
 
+    getUserData(key: string): T | null {
+        return this.getItem(key);
+    }
+
     setItem(key: string, value: T): void {
         this.cache.set(key, value);
+    }
+
+    async setUserData(key: string, value: T): Promise<void> {
+        this.setItem(key, value);
     }
 
     removeItem(key: string): void {
@@ -37,7 +48,7 @@ export class MemoryStorage<T> implements IWindowStorage<T> {
         return this.cache.has(key);
     }
 
-    clear() :void {
+    clear(): void {
         this.cache.clear();
     }
 }

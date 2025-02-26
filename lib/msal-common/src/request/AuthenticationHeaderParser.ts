@@ -3,15 +3,18 @@
  * Licensed under the MIT License.
  */
 
-import { ClientConfigurationError } from "../error/ClientConfigurationError";
-import { Constants, HeaderNames } from "../utils/Constants";
+import {
+    createClientConfigurationError,
+    ClientConfigurationErrorCodes,
+} from "../error/ClientConfigurationError.js";
+import { Constants, HeaderNames } from "../utils/Constants.js";
 
 type WWWAuthenticateChallenges = {
-    nonce?: string,
+    nonce?: string;
 };
 
 type AuthenticationInfoChallenges = {
-    nextnonce?: string
+    nextnonce?: string;
 };
 
 /**
@@ -27,37 +30,49 @@ export class AuthenticationHeaderParser {
 
     /**
      * This method parses the SHR nonce value out of either the Authentication-Info or WWW-Authenticate authentication headers.
-     * @returns 
+     * @returns
      */
     getShrNonce(): string {
         // Attempt to parse nonce from Authentiacation-Info
         const authenticationInfo = this.headers[HeaderNames.AuthenticationInfo];
         if (authenticationInfo) {
-            const authenticationInfoChallenges = this.parseChallenges<AuthenticationInfoChallenges>(authenticationInfo);
+            const authenticationInfoChallenges =
+                this.parseChallenges<AuthenticationInfoChallenges>(
+                    authenticationInfo
+                );
             if (authenticationInfoChallenges.nextnonce) {
                 return authenticationInfoChallenges.nextnonce;
             }
-            throw ClientConfigurationError.createInvalidAuthenticationHeaderError(HeaderNames.AuthenticationInfo, "nextnonce challenge is missing.");
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.invalidAuthenticationHeader
+            );
         }
 
         // Attempt to parse nonce from WWW-Authenticate
         const wwwAuthenticate = this.headers[HeaderNames.WWWAuthenticate];
         if (wwwAuthenticate) {
-            const wwwAuthenticateChallenges = this.parseChallenges<WWWAuthenticateChallenges>(wwwAuthenticate);     
-            if (wwwAuthenticateChallenges.nonce){
+            const wwwAuthenticateChallenges =
+                this.parseChallenges<WWWAuthenticateChallenges>(
+                    wwwAuthenticate
+                );
+            if (wwwAuthenticateChallenges.nonce) {
                 return wwwAuthenticateChallenges.nonce;
             }
-            throw ClientConfigurationError.createInvalidAuthenticationHeaderError(HeaderNames.WWWAuthenticate, "nonce challenge is missing.");
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.invalidAuthenticationHeader
+            );
         }
 
         // If neither header is present, throw missing headers error
-        throw ClientConfigurationError.createMissingNonceAuthenticationHeadersError();
+        throw createClientConfigurationError(
+            ClientConfigurationErrorCodes.missingNonceAuthenticationHeader
+        );
     }
 
     /**
      * Parses an HTTP header's challenge set into a key/value map.
-     * @param header 
-     * @returns 
+     * @param header
+     * @returns
      */
     private parseChallenges<T>(header: string): T {
         const schemeSeparator = header.indexOf(" ");
@@ -65,9 +80,11 @@ export class AuthenticationHeaderParser {
         const challengeMap = {} as T;
 
         challenges.forEach((challenge: string) => {
-            const [ key, value ] = challenge.split("=");
+            const [key, value] = challenge.split("=");
             // Remove escaped quotation marks (', ") from challenge string to keep only the challenge value
-            challengeMap[key] = unescape(value.replace(/['"]+/g, Constants.EMPTY_STRING));
+            challengeMap[key] = unescape(
+                value.replace(/['"]+/g, Constants.EMPTY_STRING)
+            );
         });
 
         return challengeMap;

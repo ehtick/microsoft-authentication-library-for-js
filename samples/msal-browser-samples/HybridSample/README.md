@@ -1,17 +1,17 @@
 # Hybrid SPA sample application
 
-This sample demonstrates how to use MSAL.js v2 and MSAL Node together in a "hybrid" application that performs both server-side and client-side authenication. 
+This sample demonstrates how to use MSAL.js and MSAL Node together in a "hybrid" application that performs both server-side and client-side authentication. 
 
-It shows how to use two new APIs, `enableSpaAuthorizationCode` in MSAL Node and `acquireTokenByCode` in MSAL.js v2, to authenticate a user server-side using a confidential client, and then SSO that user client-side using a second authorization code that is returned to the confidential client and redeemed by the public client client-side. This helps mitigate user experience and performance concerns that arise when performing server-side and client-side authentication for the same user, especially when third-party cookies are blocked by the browser.
+It shows how to use two new APIs, `enableSpaAuthorizationCode` in MSAL Node and `acquireTokenByCode` in MSAL.js, to authenticate a user server-side using a confidential client, and then SSO that user client-side using a second authorization code that is returned to the confidential client and redeemed by the public client client-side. This helps mitigate user experience and performance concerns that arise when performing server-side and client-side authentication for the same user, especially when third-party cookies are blocked by the browser.
 
 
 
 ## Setup
 
-1. In the Azure Portal, create a new app registration.
+1. In the Microsoft Entra admin center, create a new app registration.
 1. In the root folder for this sample, create a `.env` file and add the client id for this application as `MSAL_CLIENT_ID`.
 1. Add your application authority (e.g. `https://login.microsoftonline.com/common`) to the `.env` file as `MSAL_AUTHORITY`.
-1. In the Azure Portal, under the **Authentication** tab for your application, add the following **Web** redirect URIs:
+1. In the Microsoft Entra admin center, under the **Authentication** tab for your application, add the following **Web** redirect URIs:
     1. `http://localhost:3000/auth/server-redirect`
     1. `http://localhost:3000/auth/implicit-redirect`
 1. Also add the following **Single-page application** redirect URIs:
@@ -135,7 +135,7 @@ router.post('/server-redirect', (req, res) => {
                 preferred_username: preferredUsername // Email
             } = response.idTokenClaims;
 
-            // Spa auth code that will be redeemed by MSAL.js v2 client-side
+            // Spa auth code that will be redeemed by MSAL.js client-side
             const { code } = response;
 
             // Attach auth artifacts to session to they can be rendered downstream

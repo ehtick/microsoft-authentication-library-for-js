@@ -3,22 +3,69 @@
  * Licensed under the MIT License.
  */
 
-import { AADServerParamKeys, Constants, ResponseMode, SSOTypes, CLIENT_INFO, AuthenticationScheme, ClaimsRequestKeys, PasswordGrantConstants, OIDC_DEFAULT_SCOPES, ThrottlingConstants, HeaderNames} from "../utils/Constants";
-import { ScopeSet } from "./ScopeSet";
-import { ClientConfigurationError } from "../error/ClientConfigurationError";
-import { StringDict } from "../utils/MsalTypes";
-import { RequestValidator } from "./RequestValidator";
-import { ApplicationTelemetry, LibraryInfo } from "../config/ClientConfiguration";
-import { StringUtils } from "../utils/StringUtils";
-import { ServerTelemetryManager } from "../telemetry/server/ServerTelemetryManager";
-import { ClientInfo } from "../account/ClientInfo";
+import {
+    Constants,
+    ResponseMode,
+    CLIENT_INFO,
+    AuthenticationScheme,
+    ClaimsRequestKeys,
+    PasswordGrantConstants,
+    OIDC_DEFAULT_SCOPES,
+    ThrottlingConstants,
+    HeaderNames,
+} from "../utils/Constants.js";
+import * as AADServerParamKeys from "../constants/AADServerParamKeys.js";
+import { ScopeSet } from "./ScopeSet.js";
+import {
+    createClientConfigurationError,
+    ClientConfigurationErrorCodes,
+} from "../error/ClientConfigurationError.js";
+import { StringDict } from "../utils/MsalTypes.js";
+import { RequestValidator } from "./RequestValidator.js";
+import {
+    ApplicationTelemetry,
+    LibraryInfo,
+} from "../config/ClientConfiguration.js";
+import { ServerTelemetryManager } from "../telemetry/server/ServerTelemetryManager.js";
+import { ClientInfo } from "../account/ClientInfo.js";
+import { IPerformanceClient } from "../telemetry/performance/IPerformanceClient.js";
 
+function instrumentBrokerParams(
+    parameters: Map<string, string>,
+    correlationId?: string,
+    performanceClient?: IPerformanceClient
+) {
+    if (!correlationId) {
+        return;
+    }
+
+    const clientId = parameters.get(AADServerParamKeys.CLIENT_ID);
+    if (clientId && parameters.has(AADServerParamKeys.BROKER_CLIENT_ID)) {
+        performanceClient?.addFields(
+            {
+                embeddedClientId: clientId,
+                embeddedRedirectUri: parameters.get(
+                    AADServerParamKeys.REDIRECT_URI
+                ),
+            },
+            correlationId
+        );
+    }
+}
+
+/** @internal */
 export class RequestParameterBuilder {
-
     private parameters: Map<string, string>;
+    private readonly performanceClient?: IPerformanceClient;
+    private readonly correlationId?: string;
 
-    constructor() {
+    constructor(
+        correlationId?: string,
+        performanceClient?: IPerformanceClient
+    ) {
         this.parameters = new Map<string, string>();
+        this.performanceClient = performanceClient;
+        this.correlationId = correlationId;
     }
 
     /**
@@ -26,7 +73,8 @@ export class RequestParameterBuilder {
      */
     addResponseTypeCode(): void {
         this.parameters.set(
-            AADServerParamKeys.RESPONSE_TYPE, encodeURIComponent(Constants.CODE_RESPONSE_TYPE)
+            AADServerParamKeys.RESPONSE_TYPE,
+            encodeURIComponent(Constants.CODE_RESPONSE_TYPE)
         );
     }
 
@@ -35,7 +83,10 @@ export class RequestParameterBuilder {
      */
     addResponseTypeForTokenAndIdToken(): void {
         this.parameters.set(
-            AADServerParamKeys.RESPONSE_TYPE, encodeURIComponent(`${Constants.TOKEN_RESPONSE_TYPE} ${Constants.ID_TOKEN_RESPONSE_TYPE}`)
+            AADServerParamKeys.RESPONSE_TYPE,
+            encodeURIComponent(
+                `${Constants.TOKEN_RESPONSE_TYPE} ${Constants.ID_TOKEN_RESPONSE_TYPE}`
+            )
         );
     }
 
@@ -46,7 +97,7 @@ export class RequestParameterBuilder {
     addResponseMode(responseMode?: ResponseMode): void {
         this.parameters.set(
             AADServerParamKeys.RESPONSE_MODE,
-            encodeURIComponent((responseMode) ? responseMode : ResponseMode.QUERY)
+            encodeURIComponent(responseMode ? responseMode : ResponseMode.QUERY)
         );
     }
 
@@ -65,10 +116,27 @@ export class RequestParameterBuilder {
      * @param scopeSet
      * @param addOidcScopes
      */
-    addScopes(scopes: string[], addOidcScopes: boolean = true): void {
-        const requestScopes = addOidcScopes ? [...scopes || [], ...OIDC_DEFAULT_SCOPES] : scopes || [];
+    addScopes(
+        scopes: string[],
+        addOidcScopes: boolean = true,
+        defaultScopes: Array<string> = OIDC_DEFAULT_SCOPES
+    ): void {
+        // Always add openid to the scopes when adding OIDC scopes
+        if (
+            addOidcScopes &&
+            !defaultScopes.includes("openid") &&
+            !scopes.includes("openid")
+        ) {
+            defaultScopes.push("openid");
+        }
+        const requestScopes = addOidcScopes
+            ? [...(scopes || []), ...defaultScopes]
+            : scopes || [];
         const scopeSet = new ScopeSet(requestScopes);
-        this.parameters.set(AADServerParamKeys.SCOPE, encodeURIComponent(scopeSet.printScopes()));
+        this.parameters.set(
+            AADServerParamKeys.SCOPE,
+            encodeURIComponent(scopeSet.printScopes())
+        );
     }
 
     /**
@@ -76,7 +144,10 @@ export class RequestParameterBuilder {
      * @param clientId
      */
     addClientId(clientId: string): void {
-        this.parameters.set(AADServerParamKeys.CLIENT_ID, encodeURIComponent(clientId));
+        this.parameters.set(
+            AADServerParamKeys.CLIENT_ID,
+            encodeURIComponent(clientId)
+        );
     }
 
     /**
@@ -85,7 +156,10 @@ export class RequestParameterBuilder {
      */
     addRedirectUri(redirectUri: string): void {
         RequestValidator.validateRedirectUri(redirectUri);
-        this.parameters.set(AADServerParamKeys.REDIRECT_URI, encodeURIComponent(redirectUri));
+        this.parameters.set(
+            AADServerParamKeys.REDIRECT_URI,
+            encodeURIComponent(redirectUri)
+        );
     }
 
     /**
@@ -94,7 +168,10 @@ export class RequestParameterBuilder {
      */
     addPostLogoutRedirectUri(redirectUri: string): void {
         RequestValidator.validateRedirectUri(redirectUri);
-        this.parameters.set(AADServerParamKeys.POST_LOGOUT_URI, encodeURIComponent(redirectUri));
+        this.parameters.set(
+            AADServerParamKeys.POST_LOGOUT_URI,
+            encodeURIComponent(redirectUri)
+        );
     }
 
     /**
@@ -102,7 +179,10 @@ export class RequestParameterBuilder {
      * @param idTokenHint
      */
     addIdTokenHint(idTokenHint: string): void {
-        this.parameters.set(AADServerParamKeys.ID_TOKEN_HINT, encodeURIComponent(idTokenHint));
+        this.parameters.set(
+            AADServerParamKeys.ID_TOKEN_HINT,
+            encodeURIComponent(idTokenHint)
+        );
     }
 
     /**
@@ -110,7 +190,10 @@ export class RequestParameterBuilder {
      * @param domainHint
      */
     addDomainHint(domainHint: string): void {
-        this.parameters.set(SSOTypes.DOMAIN_HINT, encodeURIComponent(domainHint));
+        this.parameters.set(
+            AADServerParamKeys.DOMAIN_HINT,
+            encodeURIComponent(domainHint)
+        );
     }
 
     /**
@@ -118,7 +201,10 @@ export class RequestParameterBuilder {
      * @param loginHint
      */
     addLoginHint(loginHint: string): void {
-        this.parameters.set(SSOTypes.LOGIN_HINT, encodeURIComponent(loginHint));
+        this.parameters.set(
+            AADServerParamKeys.LOGIN_HINT,
+            encodeURIComponent(loginHint)
+        );
     }
 
     /**
@@ -126,7 +212,10 @@ export class RequestParameterBuilder {
      * @param loginHint
      */
     addCcsUpn(loginHint: string): void {
-        this.parameters.set(HeaderNames.CCS_HEADER, encodeURIComponent(`UPN:${loginHint}`));
+        this.parameters.set(
+            HeaderNames.CCS_HEADER,
+            encodeURIComponent(`UPN:${loginHint}`)
+        );
     }
 
     /**
@@ -134,7 +223,10 @@ export class RequestParameterBuilder {
      * @param loginHint
      */
     addCcsOid(clientInfo: ClientInfo): void {
-        this.parameters.set(HeaderNames.CCS_HEADER, encodeURIComponent(`Oid:${clientInfo.uid}@${clientInfo.utid}`));
+        this.parameters.set(
+            HeaderNames.CCS_HEADER,
+            encodeURIComponent(`Oid:${clientInfo.uid}@${clientInfo.utid}`)
+        );
     }
 
     /**
@@ -142,7 +234,7 @@ export class RequestParameterBuilder {
      * @param sid
      */
     addSid(sid: string): void {
-        this.parameters.set(SSOTypes.SID, encodeURIComponent(sid));
+        this.parameters.set(AADServerParamKeys.SID, encodeURIComponent(sid));
     }
 
     /**
@@ -150,9 +242,15 @@ export class RequestParameterBuilder {
      * @param claims
      */
     addClaims(claims?: string, clientCapabilities?: Array<string>): void {
-        const mergedClaims = this.addClientCapabilitiesToClaims(claims, clientCapabilities);
+        const mergedClaims = this.addClientCapabilitiesToClaims(
+            claims,
+            clientCapabilities
+        );
         RequestValidator.validateClaims(mergedClaims);
-        this.parameters.set(AADServerParamKeys.CLAIMS, encodeURIComponent(mergedClaims));
+        this.parameters.set(
+            AADServerParamKeys.CLAIMS,
+            encodeURIComponent(mergedClaims)
+        );
     }
 
     /**
@@ -160,7 +258,10 @@ export class RequestParameterBuilder {
      * @param correlationId
      */
     addCorrelationId(correlationId: string): void {
-        this.parameters.set(AADServerParamKeys.CLIENT_REQUEST_ID, encodeURIComponent(correlationId));
+        this.parameters.set(
+            AADServerParamKeys.CLIENT_REQUEST_ID,
+            encodeURIComponent(correlationId)
+        );
     }
 
     /**
@@ -170,12 +271,18 @@ export class RequestParameterBuilder {
     addLibraryInfo(libraryInfo: LibraryInfo): void {
         // Telemetry Info
         this.parameters.set(AADServerParamKeys.X_CLIENT_SKU, libraryInfo.sku);
-        this.parameters.set(AADServerParamKeys.X_CLIENT_VER, libraryInfo.version);
+        this.parameters.set(
+            AADServerParamKeys.X_CLIENT_VER,
+            libraryInfo.version
+        );
         if (libraryInfo.os) {
             this.parameters.set(AADServerParamKeys.X_CLIENT_OS, libraryInfo.os);
         }
         if (libraryInfo.cpu) {
-            this.parameters.set(AADServerParamKeys.X_CLIENT_CPU, libraryInfo.cpu);
+            this.parameters.set(
+                AADServerParamKeys.X_CLIENT_CPU,
+                libraryInfo.cpu
+            );
         }
     }
 
@@ -185,11 +292,17 @@ export class RequestParameterBuilder {
      */
     addApplicationTelemetry(appTelemetry: ApplicationTelemetry): void {
         if (appTelemetry?.appName) {
-            this.parameters.set(AADServerParamKeys.X_APP_NAME, appTelemetry.appName);
+            this.parameters.set(
+                AADServerParamKeys.X_APP_NAME,
+                appTelemetry.appName
+            );
         }
 
         if (appTelemetry?.appVersion) {
-            this.parameters.set(AADServerParamKeys.X_APP_VER, appTelemetry.appVersion);
+            this.parameters.set(
+                AADServerParamKeys.X_APP_VER,
+                appTelemetry.appVersion
+            );
         }
     }
 
@@ -199,7 +312,10 @@ export class RequestParameterBuilder {
      */
     addPrompt(prompt: string): void {
         RequestValidator.validatePrompt(prompt);
-        this.parameters.set(`${AADServerParamKeys.PROMPT}`, encodeURIComponent(prompt));
+        this.parameters.set(
+            `${AADServerParamKeys.PROMPT}`,
+            encodeURIComponent(prompt)
+        );
     }
 
     /**
@@ -207,8 +323,11 @@ export class RequestParameterBuilder {
      * @param state
      */
     addState(state: string): void {
-        if (!StringUtils.isEmpty(state)) {
-            this.parameters.set(AADServerParamKeys.STATE, encodeURIComponent(state));
+        if (state) {
+            this.parameters.set(
+                AADServerParamKeys.STATE,
+                encodeURIComponent(state)
+            );
         }
     }
 
@@ -217,7 +336,10 @@ export class RequestParameterBuilder {
      * @param nonce
      */
     addNonce(nonce: string): void {
-        this.parameters.set(AADServerParamKeys.NONCE, encodeURIComponent(nonce));
+        this.parameters.set(
+            AADServerParamKeys.NONCE,
+            encodeURIComponent(nonce)
+        );
     }
 
     /**
@@ -230,12 +352,23 @@ export class RequestParameterBuilder {
         codeChallenge: string,
         codeChallengeMethod: string
     ): void {
-        RequestValidator.validateCodeChallengeParams(codeChallenge, codeChallengeMethod);
+        RequestValidator.validateCodeChallengeParams(
+            codeChallenge,
+            codeChallengeMethod
+        );
         if (codeChallenge && codeChallengeMethod) {
-            this.parameters.set(AADServerParamKeys.CODE_CHALLENGE, encodeURIComponent(codeChallenge));
-            this.parameters.set(AADServerParamKeys.CODE_CHALLENGE_METHOD, encodeURIComponent(codeChallengeMethod));
+            this.parameters.set(
+                AADServerParamKeys.CODE_CHALLENGE,
+                encodeURIComponent(codeChallenge)
+            );
+            this.parameters.set(
+                AADServerParamKeys.CODE_CHALLENGE_METHOD,
+                encodeURIComponent(codeChallengeMethod)
+            );
         } else {
-            throw ClientConfigurationError.createInvalidCodeChallengeParamsError();
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.pkceParamsMissing
+            );
         }
     }
 
@@ -252,7 +385,10 @@ export class RequestParameterBuilder {
      * @param code
      */
     addDeviceCode(code: string): void {
-        this.parameters.set(AADServerParamKeys.DEVICE_CODE, encodeURIComponent(code));
+        this.parameters.set(
+            AADServerParamKeys.DEVICE_CODE,
+            encodeURIComponent(code)
+        );
     }
 
     /**
@@ -260,7 +396,10 @@ export class RequestParameterBuilder {
      * @param refreshToken
      */
     addRefreshToken(refreshToken: string): void {
-        this.parameters.set(AADServerParamKeys.REFRESH_TOKEN, encodeURIComponent(refreshToken));
+        this.parameters.set(
+            AADServerParamKeys.REFRESH_TOKEN,
+            encodeURIComponent(refreshToken)
+        );
     }
 
     /**
@@ -268,7 +407,10 @@ export class RequestParameterBuilder {
      * @param codeVerifier
      */
     addCodeVerifier(codeVerifier: string): void {
-        this.parameters.set(AADServerParamKeys.CODE_VERIFIER, encodeURIComponent(codeVerifier));
+        this.parameters.set(
+            AADServerParamKeys.CODE_VERIFIER,
+            encodeURIComponent(codeVerifier)
+        );
     }
 
     /**
@@ -276,7 +418,10 @@ export class RequestParameterBuilder {
      * @param clientSecret
      */
     addClientSecret(clientSecret: string): void {
-        this.parameters.set(AADServerParamKeys.CLIENT_SECRET, encodeURIComponent(clientSecret));
+        this.parameters.set(
+            AADServerParamKeys.CLIENT_SECRET,
+            encodeURIComponent(clientSecret)
+        );
     }
 
     /**
@@ -284,8 +429,11 @@ export class RequestParameterBuilder {
      * @param clientAssertion
      */
     addClientAssertion(clientAssertion: string): void {
-        if (!StringUtils.isEmpty(clientAssertion)) {
-            this.parameters.set(AADServerParamKeys.CLIENT_ASSERTION, encodeURIComponent(clientAssertion));
+        if (clientAssertion) {
+            this.parameters.set(
+                AADServerParamKeys.CLIENT_ASSERTION,
+                encodeURIComponent(clientAssertion)
+            );
         }
     }
 
@@ -294,8 +442,11 @@ export class RequestParameterBuilder {
      * @param clientAssertionType
      */
     addClientAssertionType(clientAssertionType: string): void {
-        if (!StringUtils.isEmpty(clientAssertionType)) {
-            this.parameters.set(AADServerParamKeys.CLIENT_ASSERTION_TYPE, encodeURIComponent(clientAssertionType));
+        if (clientAssertionType) {
+            this.parameters.set(
+                AADServerParamKeys.CLIENT_ASSERTION_TYPE,
+                encodeURIComponent(clientAssertionType)
+            );
         }
     }
 
@@ -304,7 +455,10 @@ export class RequestParameterBuilder {
      * @param clientAssertion
      */
     addOboAssertion(oboAssertion: string): void {
-        this.parameters.set(AADServerParamKeys.OBO_ASSERTION, encodeURIComponent(oboAssertion));
+        this.parameters.set(
+            AADServerParamKeys.OBO_ASSERTION,
+            encodeURIComponent(oboAssertion)
+        );
     }
 
     /**
@@ -312,7 +466,10 @@ export class RequestParameterBuilder {
      * @param grantType
      */
     addRequestTokenUse(tokenUse: string): void {
-        this.parameters.set(AADServerParamKeys.REQUESTED_TOKEN_USE, encodeURIComponent(tokenUse));
+        this.parameters.set(
+            AADServerParamKeys.REQUESTED_TOKEN_USE,
+            encodeURIComponent(tokenUse)
+        );
     }
 
     /**
@@ -320,7 +477,10 @@ export class RequestParameterBuilder {
      * @param grantType
      */
     addGrantType(grantType: string): void {
-        this.parameters.set(AADServerParamKeys.GRANT_TYPE, encodeURIComponent(grantType));
+        this.parameters.set(
+            AADServerParamKeys.GRANT_TYPE,
+            encodeURIComponent(grantType)
+        );
     }
 
     /**
@@ -333,16 +493,20 @@ export class RequestParameterBuilder {
 
     /**
      * add extraQueryParams
-     * @param eQparams
+     * @param eQParams
      */
-    addExtraQueryParameters(eQparams: StringDict): void {
-        RequestValidator.sanitizeEQParams(eQparams, this.parameters);
-        Object.keys(eQparams).forEach((key) => {
-            this.parameters.set(key, eQparams[key]);
+    addExtraQueryParameters(eQParams: StringDict): void {
+        Object.entries(eQParams).forEach(([key, value]) => {
+            if (!this.parameters.has(key) && value) {
+                this.parameters.set(key, value);
+            }
         });
     }
 
-    addClientCapabilitiesToClaims(claims?: string, clientCapabilities?: Array<string>): string {
+    addClientCapabilitiesToClaims(
+        claims?: string,
+        clientCapabilities?: Array<string>
+    ): string {
         let mergedClaims: object;
 
         // Parse provided claims into JSON object or initialize empty object
@@ -351,20 +515,24 @@ export class RequestParameterBuilder {
         } else {
             try {
                 mergedClaims = JSON.parse(claims);
-            } catch(e) {
-                throw ClientConfigurationError.createInvalidClaimsRequestError();
+            } catch (e) {
+                throw createClientConfigurationError(
+                    ClientConfigurationErrorCodes.invalidClaims
+                );
             }
         }
 
         if (clientCapabilities && clientCapabilities.length > 0) {
-            if (!mergedClaims.hasOwnProperty(ClaimsRequestKeys.ACCESS_TOKEN)){
+            if (!mergedClaims.hasOwnProperty(ClaimsRequestKeys.ACCESS_TOKEN)) {
                 // Add access_token key to claims object
                 mergedClaims[ClaimsRequestKeys.ACCESS_TOKEN] = {};
             }
 
             // Add xms_cc claim with provided clientCapabilities to access_token key
-            mergedClaims[ClaimsRequestKeys.ACCESS_TOKEN][ClaimsRequestKeys.XMS_CC] = {
-                values: clientCapabilities
+            mergedClaims[ClaimsRequestKeys.ACCESS_TOKEN][
+                ClaimsRequestKeys.XMS_CC
+            ] = {
+                values: clientCapabilities,
             };
         }
 
@@ -376,7 +544,10 @@ export class RequestParameterBuilder {
      * @param username
      */
     addUsername(username: string): void {
-        this.parameters.set(PasswordGrantConstants.username, encodeURIComponent(username));
+        this.parameters.set(
+            PasswordGrantConstants.username,
+            encodeURIComponent(username)
+        );
     }
 
     /**
@@ -384,7 +555,10 @@ export class RequestParameterBuilder {
      * @param password
      */
     addPassword(password: string): void {
-        this.parameters.set(PasswordGrantConstants.password, encodeURIComponent(password));
+        this.parameters.set(
+            PasswordGrantConstants.password,
+            encodeURIComponent(password)
+        );
     }
 
     /**
@@ -392,9 +566,15 @@ export class RequestParameterBuilder {
      * @param cnfString
      */
     addPopToken(cnfString: string): void {
-        if (!StringUtils.isEmpty(cnfString)) {
-            this.parameters.set(AADServerParamKeys.TOKEN_TYPE, AuthenticationScheme.POP);
-            this.parameters.set(AADServerParamKeys.REQ_CNF, encodeURIComponent(cnfString));
+        if (cnfString) {
+            this.parameters.set(
+                AADServerParamKeys.TOKEN_TYPE,
+                AuthenticationScheme.POP
+            );
+            this.parameters.set(
+                AADServerParamKeys.REQ_CNF,
+                encodeURIComponent(cnfString)
+            );
         }
     }
 
@@ -402,9 +582,15 @@ export class RequestParameterBuilder {
      * add SSH JWK and key ID to query params
      */
     addSshJwk(sshJwkString: string): void {
-        if(!StringUtils.isEmpty(sshJwkString)) {
-            this.parameters.set(AADServerParamKeys.TOKEN_TYPE, AuthenticationScheme.SSH);
-            this.parameters.set(AADServerParamKeys.REQ_CNF, encodeURIComponent(sshJwkString));
+        if (sshJwkString) {
+            this.parameters.set(
+                AADServerParamKeys.TOKEN_TYPE,
+                AuthenticationScheme.SSH
+            );
+            this.parameters.set(
+                AADServerParamKeys.REQ_CNF,
+                encodeURIComponent(sshJwkString)
+            );
         }
     }
 
@@ -413,22 +599,47 @@ export class RequestParameterBuilder {
      * @param serverTelemetryManager
      */
     addServerTelemetry(serverTelemetryManager: ServerTelemetryManager): void {
-        this.parameters.set(AADServerParamKeys.X_CLIENT_CURR_TELEM, serverTelemetryManager.generateCurrentRequestHeaderValue());
-        this.parameters.set(AADServerParamKeys.X_CLIENT_LAST_TELEM, serverTelemetryManager.generateLastRequestHeaderValue());
+        this.parameters.set(
+            AADServerParamKeys.X_CLIENT_CURR_TELEM,
+            serverTelemetryManager.generateCurrentRequestHeaderValue()
+        );
+        this.parameters.set(
+            AADServerParamKeys.X_CLIENT_LAST_TELEM,
+            serverTelemetryManager.generateLastRequestHeaderValue()
+        );
     }
 
     /**
      * Adds parameter that indicates to the server that throttling is supported
      */
     addThrottling(): void {
-        this.parameters.set(AADServerParamKeys.X_MS_LIB_CAPABILITY, ThrottlingConstants.X_MS_LIB_CAPABILITY_VALUE);
+        this.parameters.set(
+            AADServerParamKeys.X_MS_LIB_CAPABILITY,
+            ThrottlingConstants.X_MS_LIB_CAPABILITY_VALUE
+        );
     }
 
     /**
      * Adds logout_hint parameter for "silent" logout which prevent server account picker
      */
     addLogoutHint(logoutHint: string): void {
-        this.parameters.set(AADServerParamKeys.LOGOUT_HINT, encodeURIComponent(logoutHint));
+        this.parameters.set(
+            AADServerParamKeys.LOGOUT_HINT,
+            encodeURIComponent(logoutHint)
+        );
+    }
+
+    addBrokerParameters(params: {
+        brokerClientId: string;
+        brokerRedirectUri: string;
+    }): void {
+        const brokerParams: StringDict = {};
+        brokerParams[AADServerParamKeys.BROKER_CLIENT_ID] =
+            params.brokerClientId;
+        brokerParams[AADServerParamKeys.BROKER_REDIRECT_URI] =
+            params.brokerRedirectUri;
+
+        this.addExtraQueryParameters(brokerParams);
     }
 
     /**
@@ -440,6 +651,12 @@ export class RequestParameterBuilder {
         this.parameters.forEach((value, key) => {
             queryParameterArray.push(`${key}=${value}`);
         });
+
+        instrumentBrokerParams(
+            this.parameters,
+            this.correlationId,
+            this.performanceClient
+        );
 
         return queryParameterArray.join("&");
     }

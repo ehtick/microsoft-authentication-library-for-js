@@ -13,7 +13,7 @@ export type NativeAccountInfo = {
 };
 
 /**
- * Token response returned by Native Platform e.g. WAM
+ * Token response returned by Native Platform
  */
 export type NativeResponse = {
     access_token: string;
@@ -51,6 +51,6 @@ export type MATS = {
     silent_bi_sub_code?: number;
     silent_message?: string;
     silent_status?: number;
-    http_status?: number
+    http_status?: number;
     http_event_count?: number;
 };

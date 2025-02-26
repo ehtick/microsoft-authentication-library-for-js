@@ -3,17 +3,18 @@
  * Licensed under the MIT License.
  */
 
-import { ClientAuthError } from "../error/ClientAuthError";
-import { StringUtils } from "../utils/StringUtils";
-import { ICrypto } from "../crypto/ICrypto";
-import { Separators, Constants } from "../utils/Constants";
+import {
+    createClientAuthError,
+    ClientAuthErrorCodes,
+} from "../error/ClientAuthError.js";
+import { Separators, Constants } from "../utils/Constants.js";
 
 /**
  * Client info object which consists of two IDs. Need to add more info here.
  */
 export type ClientInfo = {
-    uid: string,
-    utid: string
+    uid: string;
+    utid: string;
 };
 
 /**
@@ -21,30 +22,45 @@ export type ClientInfo = {
  * @param rawClientInfo
  * @param crypto
  */
-export function buildClientInfo(rawClientInfo: string, crypto: ICrypto): ClientInfo {
-    if (StringUtils.isEmpty(rawClientInfo)) {
-        throw ClientAuthError.createClientInfoEmptyError();
+export function buildClientInfo(
+    rawClientInfo: string,
+    base64Decode: (input: string) => string
+): ClientInfo {
+    if (!rawClientInfo) {
+        throw createClientAuthError(ClientAuthErrorCodes.clientInfoEmptyError);
     }
 
     try {
-        const decodedClientInfo: string = crypto.base64Decode(rawClientInfo);
+        const decodedClientInfo: string = base64Decode(rawClientInfo);
         return JSON.parse(decodedClientInfo) as ClientInfo;
     } catch (e) {
-        throw ClientAuthError.createClientInfoDecodingError((e as ClientAuthError).message);
+        throw createClientAuthError(
+            ClientAuthErrorCodes.clientInfoDecodingError
+        );
     }
 }
 
 /**
  * Function to build a client info object from cached homeAccountId string
- * @param homeAccountId 
+ * @param homeAccountId
  */
-export function buildClientInfoFromHomeAccountId(homeAccountId: string): ClientInfo {
-    if (StringUtils.isEmpty(homeAccountId)) {
-        throw ClientAuthError.createClientInfoDecodingError("Home account ID was empty.");
+export function buildClientInfoFromHomeAccountId(
+    homeAccountId: string
+): ClientInfo {
+    if (!homeAccountId) {
+        throw createClientAuthError(
+            ClientAuthErrorCodes.clientInfoDecodingError
+        );
     }
-    const clientInfoParts: string[] = homeAccountId.split(Separators.CLIENT_INFO_SEPARATOR, 2);
+    const clientInfoParts: string[] = homeAccountId.split(
+        Separators.CLIENT_INFO_SEPARATOR,
+        2
+    );
     return {
         uid: clientInfoParts[0],
-        utid: clientInfoParts.length < 2 ? Constants.EMPTY_STRING : clientInfoParts[1]
+        utid:
+            clientInfoParts.length < 2
+                ? Constants.EMPTY_STRING
+                : clientInfoParts[1],
     };
 }

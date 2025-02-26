@@ -3,72 +3,107 @@
  * Licensed under the MIT License.
  */
 
-import sinon from "sinon";
-import { PublicClientApplication, BrowserAuthError } from "../../src";
-import { TEST_CONFIG, ID_TOKEN_CLAIMS, TEST_TOKENS, DEFAULT_OPENID_CONFIG_RESPONSE } from "../utils/StringConstants";
-import { SilentCacheClient } from "../../src/interaction_client/SilentCacheClient";
-import { AuthToken, CacheManager, IdTokenEntity, AccountEntity, AccessTokenEntity, CredentialType, AuthenticationScheme, RefreshTokenEntity, TimeUtils, AuthenticationResult, AccountInfo, Authority } from "@azure/msal-common";
+import { PublicClientApplication } from "../../src/index.js";
+import {
+    TEST_CONFIG,
+    ID_TOKEN_CLAIMS,
+    TEST_TOKENS,
+} from "../utils/StringConstants.js";
+import { SilentCacheClient } from "../../src/interaction_client/SilentCacheClient.js";
+import {
+    AuthToken,
+    CacheManager,
+    IdTokenEntity,
+    AccountEntity,
+    AccessTokenEntity,
+    CredentialType,
+    AuthenticationScheme,
+    RefreshTokenEntity,
+    TimeUtils,
+    AuthenticationResult,
+    AccountInfo,
+} from "@azure/msal-common";
+import { buildAccountFromIdTokenClaims, buildIdToken } from "msal-test-utils";
 
-const testAccountEntity: AccountEntity = new AccountEntity();
-testAccountEntity.homeAccountId = `${ID_TOKEN_CLAIMS.oid}.${ID_TOKEN_CLAIMS.tid}`;
-testAccountEntity.localAccountId = ID_TOKEN_CLAIMS.oid;
-testAccountEntity.environment = "login.microsoftonline.com";
-testAccountEntity.realm = ID_TOKEN_CLAIMS.tid;
-testAccountEntity.username = ID_TOKEN_CLAIMS.preferred_username;
-testAccountEntity.name = ID_TOKEN_CLAIMS.name;
-testAccountEntity.authorityType = "MSSTS";
-
-const testIdToken: IdTokenEntity = new IdTokenEntity();
-testIdToken.homeAccountId = `${ID_TOKEN_CLAIMS.oid}.${ID_TOKEN_CLAIMS.tid}`;
-testIdToken.clientId = TEST_CONFIG.MSAL_CLIENT_ID;
-testIdToken.environment = testAccountEntity.environment;
-testIdToken.realm = ID_TOKEN_CLAIMS.tid;
-testIdToken.secret = TEST_TOKENS.IDTOKEN_V2;
-testIdToken.credentialType = CredentialType.ID_TOKEN;
-
-const testAccessTokenEntity: AccessTokenEntity = new AccessTokenEntity();
-testAccessTokenEntity.homeAccountId = `${ID_TOKEN_CLAIMS.oid}.${ID_TOKEN_CLAIMS.tid}`;
-testAccessTokenEntity.clientId = TEST_CONFIG.MSAL_CLIENT_ID;
-testAccessTokenEntity.environment = testAccountEntity.environment;
-testAccessTokenEntity.realm = ID_TOKEN_CLAIMS.tid;
-testAccessTokenEntity.secret = TEST_TOKENS.ACCESS_TOKEN;
-testAccessTokenEntity.target = TEST_CONFIG.DEFAULT_SCOPES.join(" ");
-testAccessTokenEntity.credentialType = CredentialType.ACCESS_TOKEN;
-testAccessTokenEntity.expiresOn = `${TimeUtils.nowSeconds() + 3600}`;
-testAccessTokenEntity.cachedAt = `${TimeUtils.nowSeconds()}`;
-testAccessTokenEntity.tokenType = AuthenticationScheme.BEARER;
-
-const testRefreshTokenEntity: RefreshTokenEntity = new RefreshTokenEntity();
-testRefreshTokenEntity.homeAccountId = `${ID_TOKEN_CLAIMS.oid}.${ID_TOKEN_CLAIMS.tid}`;
-testRefreshTokenEntity.clientId = TEST_CONFIG.MSAL_CLIENT_ID;
-testRefreshTokenEntity.environment = testAccountEntity.environment;
-testRefreshTokenEntity.realm = ID_TOKEN_CLAIMS.tid;
-testRefreshTokenEntity.secret = TEST_TOKENS.REFRESH_TOKEN;
-testRefreshTokenEntity.credentialType = CredentialType.REFRESH_TOKEN;
-
+const testAccountEntity: AccountEntity = buildAccountFromIdTokenClaims(
+    ID_TOKEN_CLAIMS,
+    undefined,
+    { environment: "login.microsoftonline.com" }
+);
 const testAccount: AccountInfo = {
-    homeAccountId: `${ID_TOKEN_CLAIMS.oid}.${ID_TOKEN_CLAIMS.tid}`,
-    environment: testAccountEntity.environment,
-    tenantId: ID_TOKEN_CLAIMS.tid,
-    username: ID_TOKEN_CLAIMS.preferred_username,
-    localAccountId: ID_TOKEN_CLAIMS.oid,
+    ...testAccountEntity.getAccountInfo(),
     idTokenClaims: ID_TOKEN_CLAIMS,
-    name: ID_TOKEN_CLAIMS.name
+    idToken: TEST_TOKENS.IDTOKEN_V2,
 };
 
+const testIdToken: IdTokenEntity = buildIdToken(
+    ID_TOKEN_CLAIMS,
+    TEST_TOKENS.IDTOKEN_V2,
+    {
+        clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+        environment: testAccount.environment,
+    }
+);
+
+const testAccessTokenEntity: AccessTokenEntity = {
+    homeAccountId: `${ID_TOKEN_CLAIMS.oid}.${ID_TOKEN_CLAIMS.tid}`,
+    clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+    environment: testAccountEntity.environment,
+    realm: ID_TOKEN_CLAIMS.tid,
+    secret: TEST_TOKENS.ACCESS_TOKEN,
+    target: TEST_CONFIG.DEFAULT_SCOPES.join(" "),
+    credentialType: CredentialType.ACCESS_TOKEN,
+    expiresOn: `${TimeUtils.nowSeconds() + 3600}`,
+    cachedAt: `${TimeUtils.nowSeconds()}`,
+    tokenType: AuthenticationScheme.BEARER,
+};
+
+const testRefreshTokenEntity: RefreshTokenEntity = {
+    homeAccountId: `${ID_TOKEN_CLAIMS.oid}.${ID_TOKEN_CLAIMS.tid}`,
+    clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+    environment: testAccountEntity.environment,
+    realm: ID_TOKEN_CLAIMS.tid,
+    secret: TEST_TOKENS.REFRESH_TOKEN,
+    credentialType: CredentialType.REFRESH_TOKEN,
+};
 
 describe("SilentCacheClient", () => {
     let silentCacheClient: SilentCacheClient;
+    let pca: PublicClientApplication;
 
-    beforeEach(() => {
-        const pca = new PublicClientApplication({
+    beforeEach(async () => {
+        pca = new PublicClientApplication({
             auth: {
-                clientId: TEST_CONFIG.MSAL_CLIENT_ID
-            }
+                clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+            },
         });
+
+        await pca.initialize();
+        //Implementation of PCA was moved to controller.
+        pca = (pca as any).controller;
         // @ts-ignore
-        silentCacheClient = new SilentCacheClient(pca.config, pca.browserStorage, pca.browserCrypto, pca.logger, pca.eventHandler, pca.navigationClient, pca.performanceClient);
-    })
+        silentCacheClient = new SilentCacheClient(
+            //@ts-ignore
+            pca.config,
+            //@ts-ignore
+            pca.browserStorage,
+            //@ts-ignore
+            pca.browserCrypto,
+            //@ts-ignore
+            pca.logger,
+            //@ts-ignore
+            pca.eventHandler,
+            //@ts-ignore
+            pca.navigationClient,
+            //@ts-ignore
+            pca.performanceClient
+        );
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
     describe("acquireToken", () => {
         it("successfully acquires the token from the cache", async () => {
             const response: AuthenticationResult = {
@@ -82,28 +117,50 @@ describe("SilentCacheClient", () => {
                 idTokenClaims: ID_TOKEN_CLAIMS,
                 fromCache: true,
                 correlationId: "testCorrelationId",
-                expiresOn: new Date(Number(testAccessTokenEntity.expiresOn) * 1000),
-                tokenType: AuthenticationScheme.BEARER
-            }
-            sinon.stub(AuthToken, "extractTokenClaims").returns(ID_TOKEN_CLAIMS);
-            sinon.stub(CacheManager.prototype, "readAccountFromCache").returns(testAccountEntity);
-            sinon.stub(CacheManager.prototype, "readIdTokenFromCache").returns(testIdToken);
-            sinon.stub(CacheManager.prototype, "readAccessTokenFromCache").returns(testAccessTokenEntity);
-            sinon.stub(CacheManager.prototype, "readRefreshTokenFromCache").returns(testRefreshTokenEntity);
-
-            await expect(silentCacheClient.acquireToken({
-                authority: TEST_CONFIG.validAuthority,
-                correlationId: "testCorrelationId",
-                account: testAccount, 
-                scopes: ["openid"],
-                forceRefresh: false
-            })).resolves.toMatchObject(response);
+                expiresOn: new Date(
+                    Number(testAccessTokenEntity.expiresOn) * 1000
+                ),
+                tokenType: AuthenticationScheme.BEARER,
+            };
+            jest.spyOn(
+                CacheManager.prototype,
+                "readAccountFromCache"
+            ).mockReturnValue(testAccountEntity);
+            jest.spyOn(CacheManager.prototype, "getIdToken").mockReturnValue(
+                testIdToken
+            );
+            jest.spyOn(
+                CacheManager.prototype,
+                "getAccessToken"
+            ).mockReturnValue(testAccessTokenEntity);
+            jest.spyOn(
+                CacheManager.prototype,
+                "getRefreshToken"
+            ).mockReturnValue(testRefreshTokenEntity);
+            await expect(
+                silentCacheClient.acquireToken({
+                    authority: TEST_CONFIG.validAuthority,
+                    correlationId: "testCorrelationId",
+                    account: testAccount,
+                    scopes: ["openid"],
+                    forceRefresh: false,
+                })
+            ).resolves.toMatchObject(response);
         });
     });
 
     describe("logout", () => {
-        it("logout throws unsupported error", async () => {
-            await expect(silentCacheClient.logout).rejects.toMatchObject(BrowserAuthError.createSilentLogoutUnsupportedError());
+        it("logout clears browser cache", async () => {
+            // @ts-ignore
+            await pca.browserStorage.setAccount(testAccountEntity);
+            // @ts-ignore
+            await pca.browserStorage.setIdTokenCredential(testIdToken);
+
+            pca.setActiveAccount(testAccount);
+            expect(pca.getActiveAccount()).toEqual(testAccount);
+            silentCacheClient.logout({ account: testAccount });
+            //@ts-ignore
+            expect(pca.getActiveAccount()).toEqual(null);
         });
     });
 });

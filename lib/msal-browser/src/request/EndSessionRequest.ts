@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { CommonEndSessionRequest } from "@azure/msal-common";
+import { CommonEndSessionRequest } from "@azure/msal-common/browser";
 
 /**
  * EndSessionRequest
@@ -15,7 +15,9 @@ import { CommonEndSessionRequest } from "@azure/msal-common";
  * - onRedirectNavigate     - Callback that will be passed the url that MSAL will navigate to. Returning false in the callback will stop navigation.
  * - logoutHint             - A string that specifies the account that is being logged out in order to skip the server account picker on logout
  */
-export type EndSessionRequest = Partial<CommonEndSessionRequest> & {
+export type EndSessionRequest = Partial<
+    Omit<CommonEndSessionRequest, "tokenQueryParameters">
+> & {
     authority?: string;
     onRedirectNavigate?: (url: string) => boolean | void;
 };

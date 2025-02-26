@@ -8,44 +8,102 @@
  * @module @azure/msal-browser
  */
 
-/**
- * Warning: This set of exports is purely intended to be used by other MSAL libraries, and should be considered potentially unstable. We strongly discourage using them directly, you do so at your own risk.
- * Breaking changes to these APIs will be shipped under a minor version, instead of a major version.
- */
-import * as internals from "./internals";
-export { internals };
+import * as BrowserUtils from "./utils/BrowserUtils.js";
+export { BrowserUtils };
 
-export { PublicClientApplication } from "./app/PublicClientApplication";
-export { Configuration, BrowserAuthOptions, CacheOptions, BrowserSystemOptions, BrowserConfiguration, DEFAULT_IFRAME_TIMEOUT_MS } from "./config/Configuration";
-export { InteractionType, InteractionStatus, BrowserCacheLocation, WrapperSKU, ApiId, CacheLookupPolicy } from "./utils/BrowserConstants";
-export { BrowserUtils } from "./utils/BrowserUtils";
+export {
+    PublicClientApplication,
+    createNestablePublicClientApplication,
+    createStandardPublicClientApplication,
+} from "./app/PublicClientApplication.js";
+export { PublicClientNext } from "./app/PublicClientNext.js";
+export { IController } from "./controllers/IController.js";
+export {
+    Configuration,
+    BrowserAuthOptions,
+    CacheOptions,
+    BrowserSystemOptions,
+    BrowserTelemetryOptions,
+    BrowserConfiguration,
+    DEFAULT_IFRAME_TIMEOUT_MS,
+} from "./config/Configuration.js";
+export {
+    InteractionType,
+    InteractionStatus,
+    BrowserCacheLocation,
+    WrapperSKU,
+    ApiId,
+    CacheLookupPolicy,
+} from "./utils/BrowserConstants.js";
 
 // Browser Errors
-export { BrowserAuthError, BrowserAuthErrorMessage } from "./error/BrowserAuthError";
-export { BrowserConfigurationAuthError, BrowserConfigurationAuthErrorMessage } from "./error/BrowserConfigurationAuthError";
+export {
+    BrowserAuthError,
+    BrowserAuthErrorMessage,
+    BrowserAuthErrorCodes,
+} from "./error/BrowserAuthError.js";
+export {
+    BrowserConfigurationAuthError,
+    BrowserConfigurationAuthErrorCodes,
+    BrowserConfigurationAuthErrorMessage,
+} from "./error/BrowserConfigurationAuthError.js";
 
 // Interfaces
-export { IPublicClientApplication, stubbedPublicClientApplication } from "./app/IPublicClientApplication";
-export { INavigationClient } from "./navigation/INavigationClient";
-export { NavigationClient } from "./navigation/NavigationClient";
-export { NavigationOptions } from "./navigation/NavigationOptions";
-export { PopupRequest } from "./request/PopupRequest";
-export { RedirectRequest } from "./request/RedirectRequest";
-export { SilentRequest } from "./request/SilentRequest";
-export { SsoSilentRequest } from "./request/SsoSilentRequest";
-export { EndSessionRequest } from "./request/EndSessionRequest";
-export { EndSessionPopupRequest } from "./request/EndSessionPopupRequest";
-export { AuthorizationUrlRequest } from "./request/AuthorizationUrlRequest";
-export { AuthorizationCodeRequest } from "./request/AuthorizationCodeRequest";
+export {
+    IPublicClientApplication,
+    stubbedPublicClientApplication,
+} from "./app/IPublicClientApplication.js";
+export { INavigationClient } from "./navigation/INavigationClient.js";
+export { NavigationClient } from "./navigation/NavigationClient.js";
+export { NavigationOptions } from "./navigation/NavigationOptions.js";
+export { PopupRequest } from "./request/PopupRequest.js";
+export { RedirectRequest } from "./request/RedirectRequest.js";
+export { SilentRequest } from "./request/SilentRequest.js";
+export { SsoSilentRequest } from "./request/SsoSilentRequest.js";
+export { EndSessionRequest } from "./request/EndSessionRequest.js";
+export { EndSessionPopupRequest } from "./request/EndSessionPopupRequest.js";
+export { AuthorizationUrlRequest } from "./request/AuthorizationUrlRequest.js";
+export { AuthorizationCodeRequest } from "./request/AuthorizationCodeRequest.js";
+export { AuthenticationResult } from "./response/AuthenticationResult.js";
+export { ClearCacheRequest } from "./request/ClearCacheRequest.js";
+export { InitializeApplicationRequest } from "./request/InitializeApplicationRequest.js";
 
 // Cache
-export { LoadTokenOptions } from "./cache/TokenCache";
+export { LoadTokenOptions } from "./cache/TokenCache.js";
+export { ITokenCache } from "./cache/ITokenCache.js";
+
+// Storage
+export { MemoryStorage } from "./cache/MemoryStorage.js";
+export { LocalStorage } from "./cache/LocalStorage.js";
+export { SessionStorage } from "./cache/SessionStorage.js";
+export { IWindowStorage } from "./cache/IWindowStorage.js";
 
 // Events
-export { EventMessage, EventPayload, EventError, EventCallbackFunction, EventMessageUtils, PopupEvent } from "./event/EventMessage";
-export { EventType } from "./event/EventType";
+export {
+    EventMessage,
+    EventPayload,
+    EventError,
+    EventCallbackFunction,
+    EventMessageUtils,
+    PopupEvent,
+} from "./event/EventMessage.js";
+export { EventType } from "./event/EventType.js";
+export { EventHandler } from "./event/EventHandler.js";
 
-export { SignedHttpRequest, SignedHttpRequestOptions } from "./crypto/SignedHttpRequest";
+export {
+    SignedHttpRequest,
+    SignedHttpRequestOptions,
+} from "./crypto/SignedHttpRequest.js";
+
+export {
+    PopupWindowAttributes,
+    PopupSize,
+    PopupPosition,
+} from "./request/PopupWindowAttributes.js";
+
+// Telemetry
+export { BrowserPerformanceClient } from "./telemetry/BrowserPerformanceClient.js";
+export { BrowserPerformanceMeasurement } from "./telemetry/BrowserPerformanceMeasurement.js";
 
 // Common Object Formats
 export {
@@ -53,16 +111,19 @@ export {
     // Account
     AccountInfo,
     AccountEntity,
-    // Response
-    AuthenticationResult,
+    IdTokenClaims,
     // Error
     AuthError,
+    AuthErrorCodes,
     AuthErrorMessage,
     ClientAuthError,
+    ClientAuthErrorCodes,
     ClientAuthErrorMessage,
     ClientConfigurationError,
+    ClientConfigurationErrorCodes,
     ClientConfigurationErrorMessage,
     InteractionRequiredAuthError,
+    InteractionRequiredAuthErrorCodes,
     InteractionRequiredAuthErrorMessage,
     ServerError,
     // Network
@@ -75,19 +136,27 @@ export {
     LogLevel,
     // Protocol Mode
     ProtocolMode,
+    ServerResponseType,
+    PromptValue,
     // Server Response
     ExternalTokenResponse,
     // Utils
     StringUtils,
     UrlString,
+    JsonWebTokenTypes,
     // AzureCloudInstance enum
     AzureCloudInstance,
     AzureCloudOptions,
     AuthenticationHeaderParser,
     OIDC_DEFAULT_SCOPES,
-    PerformanceCallbackFunction, 
-    PerformanceEvent, 
-    PerformanceEvents
-} from "@azure/msal-common";
+    PerformanceCallbackFunction,
+    PerformanceEvent,
+    PerformanceEvents,
+    // Telemetry
+    InProgressPerformanceEvent,
+    TenantProfile,
+    IPerformanceClient,
+    StubPerformanceClient,
+} from "@azure/msal-common/browser";
 
-export { version } from "./packageMetadata";
+export { version } from "./packageMetadata.js";

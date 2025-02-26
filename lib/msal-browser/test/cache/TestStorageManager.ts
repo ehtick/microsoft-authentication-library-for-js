@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { ValidCredentialType } from "@azure/msal-common";
 import {
     CacheManager,
     AccountEntity,
@@ -13,67 +12,110 @@ import {
     AppMetadataEntity,
     ServerTelemetryEntity,
     ThrottlingEntity,
-    CredentialEntity,
-    CredentialType,
-    AuthorityMetadataEntity
+    AuthorityMetadataEntity,
+    ValidCredentialType,
+    TokenKeys,
+    CacheHelpers,
 } from "@azure/msal-common";
+
+const ACCOUNT_KEYS = "ACCOUNT_KEYS";
+const TOKEN_KEYS = "TOKEN_KEYS";
 
 export class TestStorageManager extends CacheManager {
     store = {};
 
     // Accounts
     getAccount(key: string): AccountEntity | null {
-        const account: AccountEntity = this.store[key] as AccountEntity;
-        if (AccountEntity.isAccountEntity(account)) {
-            return account;
+        const account = this.store[key] as AccountEntity;
+        if (!account) {
+            this.removeAccountKeyFromMap(key);
+            return null;
         }
-        return null;
+
+        return account;
     }
 
-    setAccount(account: AccountEntity): void {
-        const key = account.generateAccountKey();
-        this.store[key] = account;
+    removeAccountKeyFromMap(key: string): void {
+        const currentAccounts = this.getAccountKeys();
+        this.store[ACCOUNT_KEYS] = currentAccounts.filter(
+            (entry) => entry !== key
+        );
+    }
+
+    async setAccount(value: AccountEntity): Promise<void> {
+        const key = value.generateAccountKey();
+        this.store[key] = value;
+
+        const currentAccounts = this.getAccountKeys();
+        if (!currentAccounts.includes(key)) {
+            currentAccounts.push(key);
+            this.store[ACCOUNT_KEYS] = currentAccounts;
+        }
+    }
+
+    async removeAccount(key: string): Promise<void> {
+        await super.removeAccount(key);
+        this.removeAccountKeyFromMap(key);
+    }
+
+    getAccountKeys(): string[] {
+        return this.store[ACCOUNT_KEYS] || [];
+    }
+
+    getTokenKeys(): TokenKeys {
+        return (
+            this.store[TOKEN_KEYS] || {
+                idToken: [],
+                accessToken: [],
+                refreshToken: [],
+            }
+        );
     }
 
     // Credentials (idtokens)
     getIdTokenCredential(key: string): IdTokenEntity | null {
-        const credType = CredentialEntity.getCredentialType(key);
-        if (credType === CredentialType.ID_TOKEN) {
-            return this.store[key] as IdTokenEntity;
-        }
-        return null;
+        return (this.store[key] as IdTokenEntity) || null;
     }
 
-    setIdTokenCredential(idToken: IdTokenEntity): void {
-        const idTokenKey = idToken.generateCredentialKey();
+    async setIdTokenCredential(idToken: IdTokenEntity): Promise<void> {
+        const idTokenKey = CacheHelpers.generateCredentialKey(idToken);
         this.store[idTokenKey] = idToken;
+
+        const tokenKeys = this.getTokenKeys();
+        tokenKeys.idToken.push(idTokenKey);
+        this.store[TOKEN_KEYS] = tokenKeys;
     }
 
     // Credentials (accesstokens)
     getAccessTokenCredential(key: string): AccessTokenEntity | null {
-        const credType = CredentialEntity.getCredentialType(key);
-        if (credType === CredentialType.ACCESS_TOKEN) {
-            return this.store[key] as AccessTokenEntity;
-        }
-        return null;
+        return (this.store[key] as AccessTokenEntity) || null;
     }
 
-    setAccessTokenCredential(accessToken: AccessTokenEntity): void {
-        const accessTokenKey = accessToken.generateCredentialKey();
+    async setAccessTokenCredential(
+        accessToken: AccessTokenEntity
+    ): Promise<void> {
+        const accessTokenKey = CacheHelpers.generateCredentialKey(accessToken);
         this.store[accessTokenKey] = accessToken;
+
+        const tokenKeys = this.getTokenKeys();
+        tokenKeys.accessToken.push(accessTokenKey);
+        this.store[TOKEN_KEYS] = tokenKeys;
     }
 
     // Credentials (accesstokens)
     getRefreshTokenCredential(key: string): RefreshTokenEntity | null {
-        const credType = CredentialEntity.getCredentialType(key);
-        if (credType === CredentialType.REFRESH_TOKEN) {
-            return this.store[key] as RefreshTokenEntity;
-        }
-        return null;
+        return (this.store[key] as RefreshTokenEntity) || null;
     }
-    setRefreshTokenCredential(refreshToken: RefreshTokenEntity): void {
-        const refreshTokenKey = refreshToken.generateCredentialKey();
+    async setRefreshTokenCredential(
+        refreshToken: RefreshTokenEntity
+    ): Promise<void> {
+        const refreshTokenKey =
+            CacheHelpers.generateCredentialKey(refreshToken);
         this.store[refreshTokenKey] = refreshToken;
+
+        const tokenKeys = this.getTokenKeys();
+        tokenKeys.refreshToken.push(refreshTokenKey);
+        this.store[TOKEN_KEYS] = tokenKeys;
     }
 
     // AppMetadata
@@ -82,7 +124,7 @@ export class TestStorageManager extends CacheManager {
     }
 
     setAppMetadata(appMetadata: AppMetadataEntity): void {
-        const appMetadataKey = appMetadata.generateAppMetadataKey();
+        const appMetadataKey = CacheHelpers.generateAppMetadataKey(appMetadata);
         this.store[appMetadataKey] = appMetadata;
     }
 
@@ -90,7 +132,7 @@ export class TestStorageManager extends CacheManager {
     getAuthorityMetadata(key: string): AuthorityMetadataEntity | null {
         return this.store[key] as AuthorityMetadataEntity;
     }
-    
+
     setAuthorityMetadata(key: string, value: AuthorityMetadataEntity): void {
         this.store[key] = value;
     }
@@ -134,19 +176,5 @@ export class TestStorageManager extends CacheManager {
     }
     async clear(): Promise<void> {
         this.store = {};
-    }
-    updateCredentialCacheKey(currentCacheKey: string, credential: ValidCredentialType): string {
-        const updatedCacheKey = credential.generateCredentialKey();
-
-        if (currentCacheKey !== updatedCacheKey) {
-            const cacheItem = this.store[currentCacheKey];
-            if (cacheItem) {
-                this.removeItem(currentCacheKey);
-                this.store[updatedCacheKey] = cacheItem;
-                return updatedCacheKey;
-            }
-        }
-
-        return currentCacheKey;
     }
 }

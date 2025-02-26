@@ -9,9 +9,11 @@ import { RefreshTokenEntity } from "../../../src/cache/entities/RefreshTokenEnti
 import { AccountEntity } from "../../../src/cache/entities/AccountEntity";
 import { AppMetadataEntity } from "../../../src/cache/entities/AppMetadataEntity";
 import { AuthenticationScheme } from "../../../src/utils/Constants";
+import { CacheHelpers } from "../../../src";
+import { TEST_CONFIG } from "../../test_kit/StringConstants";
 
 // mock tokens
-export const mockAccessTokenEntity_1 = {
+export const mockAccessTokenEntity_1: AccessTokenEntity = {
     homeAccountId: "uid.utid",
     environment: "login.microsoftonline.com",
     credentialType: "AccessToken",
@@ -24,7 +26,7 @@ export const mockAccessTokenEntity_1 = {
     extendedExpiresOn: "4600",
 };
 
-export const mockAccessTokenEntity_2 = {
+export const mockAccessTokenEntity_2: AccessTokenEntity = {
     homeAccountId: "uid.utid",
     environment: "login.microsoftonline.com",
     credentialType: "AccessToken",
@@ -34,10 +36,10 @@ export const mockAccessTokenEntity_2 = {
     target: "scope4 scope5",
     cachedAt: "1000",
     expiresOn: "4600",
-    extendedExpiresOn: "4600"
+    extendedExpiresOn: "4600",
 };
 
-export const mockAccessTokenWithAuthSchemeEntity = {
+export const mockAccessTokenWithAuthSchemeEntity: AccessTokenEntity = {
     homeAccountId: "uid.utid",
     environment: "login.microsoftonline.com",
     credentialType: "AccessToken_With_AuthScheme",
@@ -49,38 +51,38 @@ export const mockAccessTokenWithAuthSchemeEntity = {
     expiresOn: "4600",
     extendedExpiresOn: "4600",
     tokenType: "pop",
-    keyId: "someKeyId123"
+    keyId: "someKeyId123",
 };
 
-export const mockIdTokenEntity = {
+export const mockIdTokenEntity: IdTokenEntity = {
     homeAccountId: "uid.utid",
     environment: "login.microsoftonline.com",
     credentialType: "IdToken",
     clientId: "mock_client_id",
     secret: "header.eyJvaWQiOiAib2JqZWN0MTIzNCIsICJwcmVmZXJyZWRfdXNlcm5hbWUiOiAiSm9obiBEb2UiLCAic3ViIjogInN1YiJ9.signature",
-    realm: "microsoft"
+    realm: "microsoft",
 };
 
-export const mockRefreshTokenEntity = {
-    homeAccountId: "uid.utid",
-    environment: "login.microsoftonline.com",
-    credentialType: "RefreshToken",
-    clientId: "mock_client_id",
-    secret: "a refresh token"
-};
-
-export const mockRefreshTokenEntityWithFamilyId = {
+export const mockRefreshTokenEntity: RefreshTokenEntity = {
     homeAccountId: "uid.utid",
     environment: "login.microsoftonline.com",
     credentialType: "RefreshToken",
     clientId: "mock_client_id",
     secret: "a refresh token",
-    familyId: "1"
+};
+
+export const mockRefreshTokenEntityWithFamilyId: RefreshTokenEntity = {
+    homeAccountId: "uid.utid",
+    environment: "login.microsoftonline.com",
+    credentialType: "RefreshToken",
+    clientId: "mock_client_id",
+    secret: "a refresh token",
+    familyId: "1",
 };
 
 export const mockAccountEntity = {
     homeAccountId: "uid.utid",
-    environment:  "login.microsoftonline.com",
+    environment: "login.microsoftonline.com",
     realm: "microsoft",
     localAccountId: "object1234",
     username: "John Doe",
@@ -91,29 +93,21 @@ export const mockAccountEntity = {
 export const mockAppMetaDataEntity = {
     clientId: "mock_client_id",
     environment: "login.microsoftonline.com",
-    familyId: "1"
+    familyId: "1",
 };
 
 // generate mockCache
 export class mockCache {
-
     static createMockATOne(): AccessTokenEntity {
-        const at = new AccessTokenEntity();
-        Object.assign(at, mockAccessTokenEntity_1);
-
-        return at;
+        return mockAccessTokenEntity_1;
     }
 
     static createMockATTwo(): AccessTokenEntity {
-        const at = new AccessTokenEntity();
-        Object.assign(at, mockAccessTokenEntity_2);
-
-        return at;
+        return mockAccessTokenEntity_2;
     }
 
     static createMockAdfsAt(): AccessTokenEntity {
-        const at = new AccessTokenEntity();
-        Object.assign(at, mockAccessTokenEntity_1);
+        const at = { ...mockAccessTokenEntity_1 };
 
         // @ts-ignore
         at.tokenType = AuthenticationScheme.BEARER.toLowerCase(); // ADFS may return type as "bearer" (lowercase)
@@ -122,31 +116,19 @@ export class mockCache {
     }
 
     static createMockPopAT(): AccessTokenEntity {
-        const popAt = new AccessTokenEntity();
-        Object.assign(popAt, mockAccessTokenWithAuthSchemeEntity);
-
-        return popAt;
+        return mockAccessTokenWithAuthSchemeEntity;
     }
 
     static createMockIdT(): IdTokenEntity {
-        const idt = new IdTokenEntity();
-        Object.assign(idt, mockIdTokenEntity);
-
-        return idt;
+        return mockIdTokenEntity;
     }
 
     static createMockRT(): RefreshTokenEntity {
-        const rt = new RefreshTokenEntity();
-        Object.assign(rt, mockRefreshTokenEntity);
-
-        return rt;
+        return mockRefreshTokenEntity;
     }
 
     static createMockRTWithFamilyId(): RefreshTokenEntity {
-        const rt = new RefreshTokenEntity();
-        Object.assign(rt, mockRefreshTokenEntityWithFamilyId);
-
-        return rt;
+        return mockRefreshTokenEntityWithFamilyId;
     }
 
     static createMockAcc(): AccountEntity {
@@ -157,8 +139,11 @@ export class mockCache {
     }
 
     static createMockAmdt(): AppMetadataEntity {
-        const amdt = new AppMetadataEntity();
-        Object.assign(amdt, mockAppMetaDataEntity);
+        const amdt = {
+            clientId: TEST_CONFIG.MSAL_CLIENT_ID,
+            environment: TEST_CONFIG.validAuthorityHost,
+            familyId: TEST_CONFIG.THE_FAMILY_ID,
+        };
 
         return amdt;
     }
@@ -166,18 +151,20 @@ export class mockCache {
 
 export const MockCache = {
     atOne: mockCache.createMockATOne(),
-    atOneKey: mockCache.createMockATOne().generateCredentialKey(),
+    atOneKey: CacheHelpers.generateCredentialKey(mockCache.createMockATOne()),
     atTwo: mockCache.createMockATTwo(),
-    atTwoKey: mockCache.createMockATTwo().generateCredentialKey(),
+    atTwoKey: CacheHelpers.generateCredentialKey(mockCache.createMockATTwo()),
     popAt: mockCache.createMockPopAT(),
     idT: mockCache.createMockIdT(),
-    idTKey: mockCache.createMockIdT().generateCredentialKey(),
+    idTKey: CacheHelpers.generateCredentialKey(mockCache.createMockIdT()),
     rt: mockCache.createMockRT(),
-    rtKey: mockCache.createMockRT().generateCredentialKey(),
+    rtKey: CacheHelpers.generateCredentialKey(mockCache.createMockRT()),
     rtF: mockCache.createMockRTWithFamilyId(),
-    rtFKey: mockCache.createMockRTWithFamilyId().generateCredentialKey(),
+    rtFKey: CacheHelpers.generateCredentialKey(
+        mockCache.createMockRTWithFamilyId()
+    ),
     acc: mockCache.createMockAcc(),
     accKey: mockCache.createMockAcc().generateAccountKey(),
     amdt: mockCache.createMockAmdt(),
-    amdtKey: mockCache.createMockAmdt().generateAppMetadataKey()
+    amdtKey: CacheHelpers.generateAppMetadataKey(mockCache.createMockAmdt()),
 };

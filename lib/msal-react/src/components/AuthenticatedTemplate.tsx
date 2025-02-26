@@ -4,25 +4,30 @@
  */
 
 import React, { PropsWithChildren, useMemo } from "react";
-import { AccountIdentifiers } from "../types/AccountIdentifiers";
-import { getChildrenOrFunction } from "../utils/utilities";
-import { useMsal } from "../hooks/useMsal";
-import { useIsAuthenticated } from "../hooks/useIsAuthenticated";
+import { AccountIdentifiers } from "../types/AccountIdentifiers.js";
+import { getChildrenOrFunction } from "../utils/utilities.js";
+import { useMsal } from "../hooks/useMsal.js";
+import { useIsAuthenticated } from "../hooks/useIsAuthenticated.js";
 import { InteractionStatus } from "@azure/msal-browser";
 
 export type AuthenticatedTemplateProps = PropsWithChildren<AccountIdentifiers>;
 
 /**
  * Renders child components if user is authenticated
- * @param props 
+ * @param props
  */
-export function AuthenticatedTemplate({ username, homeAccountId, localAccountId, children }: AuthenticatedTemplateProps): React.ReactElement|null {
+export function AuthenticatedTemplate({
+    username,
+    homeAccountId,
+    localAccountId,
+    children,
+}: AuthenticatedTemplateProps): React.ReactElement | null {
     const context = useMsal();
     const accountIdentifier: AccountIdentifiers = useMemo(() => {
         return {
             username,
             homeAccountId,
-            localAccountId
+            localAccountId,
         };
     }, [username, homeAccountId, localAccountId]);
     const isAuthenticated = useIsAuthenticated(accountIdentifier);

@@ -3,23 +3,25 @@
  * Licensed under the MIT License.
  */
 
-import { StringUtils } from "../utils/StringUtils";
-import { ClientConfigurationError } from "../error/ClientConfigurationError";
-import { PromptValue, CodeChallengeMethodValues} from "../utils/Constants";
-import { StringDict } from "../utils/MsalTypes";
+import {
+    createClientConfigurationError,
+    ClientConfigurationErrorCodes,
+} from "../error/ClientConfigurationError.js";
+import { PromptValue, CodeChallengeMethodValues } from "../utils/Constants.js";
 
 /**
  * Validates server consumable params from the "request" objects
  */
 export class RequestValidator {
-
     /**
      * Utility to check if the `redirectUri` in the request is a non-null value
      * @param redirectUri
      */
-    static validateRedirectUri(redirectUri: string) : void {
-        if (StringUtils.isEmpty(redirectUri)) {
-            throw ClientConfigurationError.createRedirectUriEmptyError();
+    static validateRedirectUri(redirectUri: string): void {
+        if (!redirectUri) {
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.redirectUriEmpty
+            );
         }
     }
 
@@ -27,7 +29,7 @@ export class RequestValidator {
      * Utility to validate prompt sent by the user in the request
      * @param prompt
      */
-    static validatePrompt(prompt: string) : void {
+    static validatePrompt(prompt: string): void {
         const promptValues = [];
 
         for (const value in PromptValue) {
@@ -35,15 +37,19 @@ export class RequestValidator {
         }
 
         if (promptValues.indexOf(prompt) < 0) {
-            throw ClientConfigurationError.createInvalidPromptError(prompt);
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.invalidPromptValue
+            );
         }
     }
 
-    static validateClaims(claims: string) : void {
+    static validateClaims(claims: string): void {
         try {
             JSON.parse(claims);
-        } catch(e) {
-            throw ClientConfigurationError.createInvalidClaimsRequestError();
+        } catch (e) {
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.invalidClaims
+            );
         }
     }
 
@@ -52,9 +58,14 @@ export class RequestValidator {
      * @param codeChallenge
      * @param codeChallengeMethod
      */
-    static validateCodeChallengeParams(codeChallenge: string, codeChallengeMethod: string) : void  {
-        if (StringUtils.isEmpty(codeChallenge) || StringUtils.isEmpty(codeChallengeMethod)) {
-            throw ClientConfigurationError.createInvalidCodeChallengeParamsError();
+    static validateCodeChallengeParams(
+        codeChallenge: string,
+        codeChallengeMethod: string
+    ): void {
+        if (!codeChallenge || !codeChallengeMethod) {
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.pkceParamsMissing
+            );
         } else {
             this.validateCodeChallengeMethod(codeChallengeMethod);
         }
@@ -64,33 +75,16 @@ export class RequestValidator {
      * Utility to validate code_challenge_method
      * @param codeChallengeMethod
      */
-    static validateCodeChallengeMethod(codeChallengeMethod: string) : void {
+    static validateCodeChallengeMethod(codeChallengeMethod: string): void {
         if (
             [
                 CodeChallengeMethodValues.PLAIN,
-                CodeChallengeMethodValues.S256
+                CodeChallengeMethodValues.S256,
             ].indexOf(codeChallengeMethod) < 0
         ) {
-            throw ClientConfigurationError.createInvalidCodeChallengeMethodError();
+            throw createClientConfigurationError(
+                ClientConfigurationErrorCodes.invalidCodeChallengeMethod
+            );
         }
-    }
-
-    /**
-     * Removes unnecessary or duplicate query parameters from extraQueryParameters
-     * @param request
-     */
-    static sanitizeEQParams(eQParams: StringDict, queryParams: Map<string, string>) : StringDict {
-        if (!eQParams) {
-            return {};
-        }
-
-        // Remove any query parameters already included in SSO params
-        queryParams.forEach((value, key) => {
-            if (eQParams[key]) {
-                delete eQParams[key];
-            }
-        });
-
-        return eQParams;
     }
 }

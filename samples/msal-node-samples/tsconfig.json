@@ -18,15 +18,18 @@
         "importHelpers": true,
         "noImplicitAny": true,
         "downlevelIteration": true,
+        "types": [
+            "node",
+            "jest"
+        ],
+        "outDir": "dist",
     },
-    "include": ["**/test/*.spec.ts"],
+    "include": [
+        "**/test/*.spec.ts"
+    ],
     "exclude": [
         "node_modules"
     ],
-    "types": [
-        "node",
-        "jest"
-    ],
     "compileOnSave": false,
     "buildOnSave": false,
-} 
+}

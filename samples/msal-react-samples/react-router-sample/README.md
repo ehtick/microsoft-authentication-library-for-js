@@ -42,13 +42,14 @@ For more information, visit:
 
 ### Configure the application
 
-- Open `./src/authConfig.js` in an editor.
-- Replace client id with the Application (client) ID from the portal registration, or use the currently configured lab registration.
+- Open `./env.development` in an editor.
+- Replace `ENTER_CLIENT_ID_HERE` with the Application (client) ID from the portal registration, or use the currently configured lab registration.
+- Replace `ENTER_TENANT_ID_HERE` with the tenant ID from the portal registration, or use the currently configured lab registration.
   - Optionally, you may replace any of the other parameters, or you can remove them and use the default values.
 
-#### Install npm dependencies for sample
+These parameters are used in `./src/authConfig.js` to configure MSAL.
 
-##### Installing @azure/msal-react and @azure/msal-browser from local builds
+#### Install npm dependencies for sample
 
 ```bash
 # Install dev dependencies for msal-react and msal-browser from root of repo
@@ -59,34 +60,6 @@ cd samples/msal-react-samples/react-router-sample
 
 # Build packages locally
 npm run build:package
-
-# Install local libs
-npm run install:local
-
-# Install sample dependencies
-npm install
-```
-
-Note: If you suspect you are not using the local builds check that the `package.json` file shows the following dependencies:
-
-```
-"@azure/msal-react": "file:../../../lib/msal-react",
-"@azure/msal-browser": "file:../../../lib/msal-browser",
-"react": "file:../../../lib/msal-react/node_modules/react",
-"react-dom": "file:../../../lib/msal-react/node_modules/react-dom",
-```
-
-##### Installing @azure/msal-react and @azure/msal-browser from released versions available on npm
-
-```bash
-# Change directory to sample directory
-cd samples/msal-react-samples/react-router-sample
-
-# Install packages from npm
-npm run install:published
-
-# Install rest of dependencies
-npm install
 ```
 
 #### Running the sample development server
