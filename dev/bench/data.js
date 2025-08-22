@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1755810883958,
+  "lastUpdate": 1755875685035,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -644,6 +644,44 @@ window.BENCHMARK_DATA = {
             "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
             "value": 237560,
             "range": "±0.96%",
+            "unit": "ops/sec",
+            "extra": "233 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "thomas.norling@microsoft.com",
+            "name": "Thomas Norling",
+            "username": "tnorling"
+          },
+          "committer": {
+            "email": "kshabelko@microsoft.com",
+            "name": "Konstantin",
+            "username": "konstantin-msft"
+          },
+          "distinct": true,
+          "id": "2e533d593544f82bbb01457cf1bda403e6d7f708",
+          "message": "resolve comments",
+          "timestamp": "2025-08-22T10:33:46-04:00",
+          "tree_id": "1b8fe5525d4d71bb47e0cd02e17d9d27641d8eeb",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/2e533d593544f82bbb01457cf1bda403e6d7f708"
+        },
+        "date": 1755875683548,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 241964,
+            "range": "±0.89%",
+            "unit": "ops/sec",
+            "extra": "228 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 242054,
+            "range": "±0.70%",
             "unit": "ops/sec",
             "extra": "233 samples"
           }
