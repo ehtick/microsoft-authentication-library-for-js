@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1756178084172,
+  "lastUpdate": 1756329268771,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -798,6 +798,44 @@ window.BENCHMARK_DATA = {
             "range": "±1.03%",
             "unit": "ops/sec",
             "extra": "235 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ydi.w127@gmail.com",
+            "name": "Yongdi Wang",
+            "username": "yongdiw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8316ee5f4bf29bdb326bf51b9b621b29731b36dc",
+          "message": "Add extraQueryParams for api calls (#7974)",
+          "timestamp": "2025-08-27T19:50:29+01:00",
+          "tree_id": "f7501b1a73f3c1c1226d4fb37f378613125226ad",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/8316ee5f4bf29bdb326bf51b9b621b29731b36dc"
+        },
+        "date": 1756329267119,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 249792,
+            "range": "±0.75%",
+            "unit": "ops/sec",
+            "extra": "212 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 245564,
+            "range": "±0.92%",
+            "unit": "ops/sec",
+            "extra": "224 samples"
           }
         ]
       }
