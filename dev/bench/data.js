@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1757734360727,
+  "lastUpdate": 1758057929077,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -1215,6 +1215,44 @@ window.BENCHMARK_DATA = {
             "range": "±0.81%",
             "unit": "ops/sec",
             "extra": "234 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "137432604+Ugonnaak1@users.noreply.github.com",
+            "name": "Ugonna Akali",
+            "username": "Ugonnaak1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aafeda0fe35c196706ce2c6d688eea2d312c4b9a",
+          "message": "Reset Redirecturi during broker fallback (#8049)\n\nIf a user attempts a broker flow but the broker isn’t available on their\nmachine, the flow falls back to the browser. However, since a redirect\nURI was provided for the broker flow, an error is thrown.\n\nThis PR adds a check to determine whether the broker is enabled in the\nconfig and resets the redirect URI to an empty string instead of\nthrowing an error.",
+          "timestamp": "2025-09-16T09:26:43-07:00",
+          "tree_id": "ee5c6c1c4ba51fba7d30e2ef4dd46de6318d73ee",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/aafeda0fe35c196706ce2c6d688eea2d312c4b9a"
+        },
+        "date": 1758057926922,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 251102,
+            "range": "±0.94%",
+            "unit": "ops/sec",
+            "extra": "222 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 248969,
+            "range": "±0.74%",
+            "unit": "ops/sec",
+            "extra": "233 samples"
           }
         ]
       }
