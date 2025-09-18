@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758147331281,
+  "lastUpdate": 1758231712746,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -1291,6 +1291,44 @@ window.BENCHMARK_DATA = {
             "range": "±0.64%",
             "unit": "ops/sec",
             "extra": "236 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "45603194+shenj@users.noreply.github.com",
+            "name": "Jian Shen",
+            "username": "shenj"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "71fa65134ade574e126eb70f9824621bf3f63ab1",
+          "message": "Add changes in network and interaction client layers to support MFA (#8048)",
+          "timestamp": "2025-09-18T21:10:59+01:00",
+          "tree_id": "478b0558f7c732c0dcaaea7cc57e9da973dfa91b",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/71fa65134ade574e126eb70f9824621bf3f63ab1"
+        },
+        "date": 1758231711129,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 251033,
+            "range": "±0.75%",
+            "unit": "ops/sec",
+            "extra": "227 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 250006,
+            "range": "±0.68%",
+            "unit": "ops/sec",
+            "extra": "224 samples"
           }
         ]
       }
