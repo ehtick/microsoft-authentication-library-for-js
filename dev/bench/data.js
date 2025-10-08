@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759789888116,
+  "lastUpdate": 1759941427029,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -1595,6 +1595,44 @@ window.BENCHMARK_DATA = {
             "range": "±0.71%",
             "unit": "ops/sec",
             "extra": "237 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "45603194+shenj@users.noreply.github.com",
+            "name": "Jian Shen",
+            "username": "shenj"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ffe81abe542469e37266bf69a7837323541a8d54",
+          "message": "[Native Auth] Update the logic for detecting phone blocked errors (#8087)",
+          "timestamp": "2025-10-08T14:16:02+01:00",
+          "tree_id": "a20929ace6fed5e8c0586e7b9b5686eae2a78aa4",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/ffe81abe542469e37266bf69a7837323541a8d54"
+        },
+        "date": 1759941425368,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 249280,
+            "range": "±0.95%",
+            "unit": "ops/sec",
+            "extra": "234 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 250310,
+            "range": "±0.62%",
+            "unit": "ops/sec",
+            "extra": "234 samples"
           }
         ]
       }
