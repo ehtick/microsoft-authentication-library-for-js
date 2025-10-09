@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759941427029,
+  "lastUpdate": 1760051315052,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -1633,6 +1633,44 @@ window.BENCHMARK_DATA = {
             "range": "±0.62%",
             "unit": "ops/sec",
             "extra": "234 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "45603194+shenj@users.noreply.github.com",
+            "name": "Jian Shen",
+            "username": "shenj"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e6420e364bc800c3299e9c6593a1b2e750a9852",
+          "message": "[Native Auth] Introduce the stateType property in state classes for the type detection (#8090)\n\nIntroduce a new property stateType in all state classes for avoid the\ncircular dependency issue which may happen in some scenarios.",
+          "timestamp": "2025-10-09T16:27:59+01:00",
+          "tree_id": "1e03b182442c03cd88c0339a33d96714382bfb82",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/1e6420e364bc800c3299e9c6593a1b2e750a9852"
+        },
+        "date": 1760051313432,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 247826,
+            "range": "±0.71%",
+            "unit": "ops/sec",
+            "extra": "234 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 245531,
+            "range": "±0.92%",
+            "unit": "ops/sec",
+            "extra": "232 samples"
           }
         ]
       }
