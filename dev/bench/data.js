@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763090081715,
+  "lastUpdate": 1763483401553,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -2089,6 +2089,44 @@ window.BENCHMARK_DATA = {
             "range": "±0.85%",
             "unit": "ops/sec",
             "extra": "232 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "45603194+shenj@users.noreply.github.com",
+            "name": "Jian Shen",
+            "username": "shenj"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "169194799418b7875e33371e123ba19c48429f96",
+          "message": "[Native Auth] Remove preview warning and typo fix (#8147)",
+          "timestamp": "2025-11-18T12:15:13Z",
+          "tree_id": "999237f860345dfaaa1ac7d2a08f4c58d60b88dd",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/169194799418b7875e33371e123ba19c48429f96"
+        },
+        "date": 1763483399401,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 246409,
+            "range": "±0.88%",
+            "unit": "ops/sec",
+            "extra": "233 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 247944,
+            "range": "±0.73%",
+            "unit": "ops/sec",
+            "extra": "216 samples"
           }
         ]
       }
