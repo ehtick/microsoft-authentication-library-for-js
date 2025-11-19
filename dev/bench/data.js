@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763483401553,
+  "lastUpdate": 1763533164332,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -2127,6 +2127,44 @@ window.BENCHMARK_DATA = {
             "range": "±0.73%",
             "unit": "ops/sec",
             "extra": "216 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "thomas.norling@microsoft.com",
+            "name": "Thomas Norling",
+            "username": "tnorling"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bfd1f6b25f15285e54e576eb89b1fee723606c48",
+          "message": "Update Copilot PR Review instructions (#8146)\n\nCopilot PR reviewer isn't always leaving code suggestions, updating the\ninstructions file to nudge Copilot to use this feature more often.\n\n---------\n\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>",
+          "timestamp": "2025-11-18T15:33:23-08:00",
+          "tree_id": "eae99a54eedb96fbfc0639bcfc0623a58786189f",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/bfd1f6b25f15285e54e576eb89b1fee723606c48"
+        },
+        "date": 1763533161945,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 224873,
+            "range": "±1.03%",
+            "unit": "ops/sec",
+            "extra": "234 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 239054,
+            "range": "±0.71%",
+            "unit": "ops/sec",
+            "extra": "237 samples"
           }
         ]
       }
