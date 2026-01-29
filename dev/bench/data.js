@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769202868058,
+  "lastUpdate": 1769647963133,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -2697,6 +2697,44 @@ window.BENCHMARK_DATA = {
             "range": "±0.89%",
             "unit": "ops/sec",
             "extra": "232 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ydi.w127@gmail.com",
+            "name": "Yongdi Wang",
+            "username": "yongdiw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6dba4feb6d055cf270c11377978ba51b8b2e091c",
+          "message": "Add JIT and MFA e2e tests and refactor (#8268)\n\nThis pull request significantly improves the documentation and\nonboarding experience for the Native Auth Sample, and removes the\nnow-redundant `test/configUtils.ts` file. The README has been overhauled\nfor clarity, providing better instructions for setup, configuration,\nrunning, and testing the sample, as well as a more detailed project\nstructure. The changes make it easier for new users to get started and\nunderstand the sample's capabilities.",
+          "timestamp": "2026-01-28T15:23:32Z",
+          "tree_id": "65373102abdc10bb519ff61f28ea0c7047531385",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/6dba4feb6d055cf270c11377978ba51b8b2e091c"
+        },
+        "date": 1769647961266,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 245172,
+            "range": "±0.84%",
+            "unit": "ops/sec",
+            "extra": "200 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 245851,
+            "range": "±0.79%",
+            "unit": "ops/sec",
+            "extra": "235 samples"
           }
         ]
       }
