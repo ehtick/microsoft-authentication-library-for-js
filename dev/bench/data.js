@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770080327672,
+  "lastUpdate": 1770677039030,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -2773,6 +2773,44 @@ window.BENCHMARK_DATA = {
             "range": "±1.00%",
             "unit": "ops/sec",
             "extra": "223 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hemoral@microsoft.com",
+            "name": "Hector Morales",
+            "username": "hectormmg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4b2c2c031f1907654fe0f8429b3f157336e1a68",
+          "message": "Add new authority metadata (#8306)\n\nThis pull request adds support for new SovCloud identity authorities in\nthe `@azure/msal-common` package. The main changes involve updating\nauthority metadata, test constants, and aliases to recognize and handle\nthe new SovCloud endpoints.\n\nAuthority metadata updates:\n\n* Added metadata for three new SovCloud authorities\n(`login.sovcloud-identity.fr`, `login.sovcloud-identity.de`,\n`login.sovcloud-identity.sg`) in `AuthorityMetadata.ts`, including their\ntoken, authorization, issuer, and logout endpoints.\n* Added these SovCloud authorities to the `trustedHostList` with their\npreferred network, cache, and aliases in `AuthorityMetadata.ts`.\n\nTest constants and aliases updates:\n\n* Added SovCloud host constants (`SovCloudFR`, `SovCloudDE`,\n`SovCloudSG`) to `StringConstants.ts` for testing purposes.\n* Updated `METADATA_ALIASES` in `StringConstants.ts` to include the new\nSovCloud authorities.\n\nDocumentation:\n\n* Added a change file documenting the patch and referencing the relevant\npull request.\n\n---------\n\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>",
+          "timestamp": "2026-02-09T10:56:13-08:00",
+          "tree_id": "b7824d6ec6a7cd8948c460711277e8c4de59b338",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/d4b2c2c031f1907654fe0f8429b3f157336e1a68"
+        },
+        "date": 1770677037484,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 244687,
+            "range": "±1.00%",
+            "unit": "ops/sec",
+            "extra": "232 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 248208,
+            "range": "±0.82%",
+            "unit": "ops/sec",
+            "extra": "234 samples"
           }
         ]
       }
