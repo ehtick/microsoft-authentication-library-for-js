@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1771026303153,
+  "lastUpdate": 1771567936784,
   "repoUrl": "https://github.com/ehtick/microsoft-authentication-library-for-js",
   "entries": {
     "msal-node client-credential Regression Test": [
@@ -2923,6 +2923,44 @@ window.BENCHMARK_DATA = {
             "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
             "value": 248517,
             "range": "±0.71%",
+            "unit": "ops/sec",
+            "extra": "235 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kshabelko@microsoft.com",
+            "name": "Konstantin",
+            "username": "konstantin-msft"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6b01484da1062075af3ee8a60433438b71904cc5",
+          "message": "[v4] Add silentRefreshReason telemetry field to PerformanceEvent (#8343)\n\nAdd silentRefreshReason field to telemetry and update related tests",
+          "timestamp": "2026-02-19T12:53:14-08:00",
+          "tree_id": "4020702d32e37f33ef3dd1d728a478df10dd2024",
+          "url": "https://github.com/ehtick/microsoft-authentication-library-for-js/commit/6b01484da1062075af3ee8a60433438b71904cc5"
+        },
+        "date": 1771567934764,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsFirstItemInTheCache",
+            "value": 249534,
+            "range": "±0.77%",
+            "unit": "ops/sec",
+            "extra": "223 samples"
+          },
+          {
+            "name": "ConfidentialClientApplication#acquireTokenByClientCredential-fromCache-resourceIsLastItemInTheCache",
+            "value": 240498,
+            "range": "±0.79%",
             "unit": "ops/sec",
             "extra": "235 samples"
           }
